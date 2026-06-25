@@ -11,7 +11,8 @@ def create_app():
     db.init_app(app)
 
     # Registro de blueprints
-    from .api.routes import dashboard
+    from .api.routes import dashboard, whatsapp
     app.register_blueprint(dashboard.bp)
+    app.register_blueprint(whatsapp.bp)
 
     return app

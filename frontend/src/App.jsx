@@ -142,15 +142,48 @@ function OpenWAView() {
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
   const [log, setLog] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [selectedSession, setSelectedSession] = useState('');
+
+  React.useEffect(() => {
+    const fetchSessions = async () => {
+      try {
+        const res = await axios.get('http://localhost:5000/api/whatsapp/sessions');
+        const data = res.data.data || [];
+        setSessions(Array.isArray(data) ? data : []);
+        if (Array.isArray(data) && data.length > 0) {
+          // OpenWA suele devolver un arreglo de objetos con id o name
+          setSelectedSession(data[0].id || data[0].name || data[0]); 
+        }
+      } catch (err) {
+        console.error("Error cargando sesiones:", err);
+      }
+    };
+    fetchSessions();
+  }, []);
 
   const handleSend = async () => {
-    if (!phone || !message) return;
-    setLog(prev => [...prev, `[TX] Para ${phone}: ${message}`]);
-    // Mocking the request for now until backend API is fully linked
-    setTimeout(() => {
-      setLog(prev => [...prev, `[RX] Éxito: Mensaje puesto en cola.`]);
-    }, 500);
-    setMessage('');
+    if (!phone || !message || !selectedSession) {
+      setLog(prev => [...prev, `[RX] ERROR: Por favor, selecciona una sesión, un número y un mensaje.`]);
+      return;
+    }
+    setLog(prev => [...prev, `[TX] Usando sesión '${selectedSession}' para despachar a ${phone}...`]);
+    
+    try {
+      // Llamada real al backend
+      const response = await axios.post('http://localhost:5000/api/whatsapp/send', {
+        session: selectedSession,
+        phone: phone,
+        text: message
+      });
+      
+      setLog(prev => [...prev, `[RX] Éxito: Backend confirmó envío a OpenWA.`]);
+      setMessage('');
+    } catch (error) {
+      console.error(error);
+      const errMsg = error.response?.data?.error || error.message;
+      setLog(prev => [...prev, `[RX] ERROR: Falló la comunicación -> ${errMsg}`]);
+    }
   };
 
   return (
@@ -162,6 +195,20 @@ function OpenWAView() {
 
       <div className="panel p-6 space-y-6">
         <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-mono text-fgMuted mb-2">SESIÓN ACTIVA</label>
+            <select 
+              value={selectedSession}
+              onChange={e => setSelectedSession(e.target.value)}
+              className="w-full bg-surface border border-border p-3 focus:outline-none focus:border-accent text-sm font-mono transition-colors"
+            >
+              <option value="" disabled>Seleccione una sesión...</option>
+              {sessions.map((s, idx) => {
+                const sName = s.id || s.name || (typeof s === 'string' ? s : `Sesion-${idx}`);
+                return <option key={sName} value={sName}>{sName}</option>
+              })}
+            </select>
+          </div>
           <div>
             <label className="block text-xs font-mono text-fgMuted mb-2">NÚMERO DESTINO (CON CÓDIGO DE PAÍS)</label>
             <input 

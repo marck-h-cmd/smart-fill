@@ -17,7 +17,7 @@ class WhatsAppService:
         Envía un mensaje de texto usando OpenWA.
         chat_id usualmente es el numero en formato internacional + '@c.us' (ej: 51999999999@c.us)
         """
-        url = f"{self.api_url}/sessions/{session_name}/messages/send"
+        url = f"{self.api_url}/sessions/{session_name}/messages/send-text"
         payload = {
             "chatId": chat_id,
             "text": text
@@ -30,3 +30,14 @@ class WhatsAppService:
         except requests.exceptions.RequestException as e:
             print(f"Error enviando mensaje WhatsApp: {e}")
             return None
+
+    def get_sessions(self):
+        """Obtiene la lista de sesiones desde OpenWA"""
+        url = f"{self.api_url}/sessions"
+        try:
+            response = requests.get(url, headers=self.get_headers())
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Error obteniendo sesiones de WhatsApp: {e}")
+            return []
