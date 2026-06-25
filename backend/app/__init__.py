@@ -1,12 +1,16 @@
 from flask import Flask
 from flask_cors import CORS
-from app.utils.db_connector import init_db
+from app.extensions import db
 
 def create_app():
     app = Flask(__name__)
+    app.config.from_object('app.config.Config')
     CORS(app)
-    init_db(app)  # Inicializar conexión
+    
+    # Inicializar base de datos con SQLAlchemy
+    db.init_app(app)
 
+    # Registro de blueprints
     from .api.routes import dashboard
     app.register_blueprint(dashboard.bp)
 

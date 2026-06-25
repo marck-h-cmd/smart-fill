@@ -1,5 +1,5 @@
-from flask import Blueprint, jsonify, g
-from app.utils.db_connector import get_db_connection
+from flask import Blueprint, jsonify
+from app.models.base import TablaMetricas
 
 bp = Blueprint('dashboard', __name__, url_prefix='/api')
 
@@ -10,10 +10,12 @@ def status():
 @bp.route('/test-db', methods=['GET'])
 def test_db():
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT @@VERSION")
-        version = cursor.fetchone()
-        return jsonify({"version": version[0]})
+        # Consultamos las tablas de SQLite usando SQLAlchemy para validar
+        tablas = TablaMetricas.query.all()
+        return jsonify({
+            "status": "success",
+            "message": f"Conectado a SQLite exitosamente. Hay {len(tablas)} tablas registradas.",
+            "data": [t.to_dict() for t in tablas]
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
