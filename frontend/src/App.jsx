@@ -32,6 +32,7 @@ function App() {
           <nav className="flex gap-1 h-full mr-6">
             <NavTab label="ESTADO DEL SISTEMA" view="system" current={activeView} set={setActiveView} />
             <NavTab label="PUENTE OPENWA" view="openwa" current={activeView} set={setActiveView} />
+            <NavTab label="CONFIGURACIÓN IA" view="ai_config" current={activeView} set={setActiveView} />
           </nav>
           <button 
             onClick={toggleTheme} 
@@ -70,6 +71,7 @@ function App() {
           <div className="max-w-4xl mx-auto">
             {activeView === 'system' && <SystemView />}
             {activeView === 'openwa' && <OpenWAView />}
+            {activeView === 'ai_config' && <AIConfigView />}
           </div>
         </div>
       </main>
@@ -246,6 +248,106 @@ function OpenWAView() {
             <p key={i} className={l.includes('[RX]') ? 'text-accent' : ''}>{l}</p>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AIConfigView() {
+  const [sessions, setSessions] = useState([]);
+  const [config, setConfig] = useState({
+    bot_session: '',
+    ai_model: 'gemini/gemini-1.5-pro',
+    ai_api_key: ''
+  });
+  const [statusMsg, setStatusMsg] = useState('');
+
+  React.useEffect(() => {
+    // Cargar sesiones de OpenWA
+    axios.get('http://localhost:5000/api/whatsapp/sessions')
+      .then(res => setSessions(Array.isArray(res.data.data) ? res.data.data : []))
+      .catch(err => console.error(err));
+
+    // Cargar configuración de la BD
+    axios.get('http://localhost:5000/api/config')
+      .then(res => {
+        if (res.data.data) {
+          setConfig(prev => ({ ...prev, ...res.data.data }));
+        }
+      })
+      .catch(err => console.error(err));
+  }, []);
+
+  const handleSave = async () => {
+    setStatusMsg('Guardando configuración...');
+    try {
+      await axios.post('http://localhost:5000/api/config', config);
+      setStatusMsg('¡Configuración guardada exitosamente!');
+      setTimeout(() => setStatusMsg(''), 3000);
+    } catch (err) {
+      setStatusMsg(`Error al guardar: ${err.message}`);
+    }
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500 max-w-2xl">
+      <div>
+        <h2 className="text-3xl font-light tracking-tight mb-2">Motor de Inteligencia Artificial</h2>
+        <p className="text-fgMuted">Configura los parámetros del LLM y la sesión asignada al bot.</p>
+      </div>
+
+      <div className="panel p-6 space-y-6">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-mono text-fgMuted mb-2">SESIÓN DE OPENWA ASIGNADA AL BOT</label>
+            <select 
+              value={config.bot_session}
+              onChange={e => setConfig({...config, bot_session: e.target.value})}
+              className="w-full bg-surface border border-border p-3 focus:outline-none focus:border-accent text-sm font-mono transition-colors"
+            >
+              <option value="">Ninguna (Bot desactivado)</option>
+              {sessions.map((s, idx) => {
+                const val = s.id || (typeof s === 'string' ? s : `Sesion-${idx}`);
+                const display = s.name || val;
+                return <option key={val} value={val}>{display}</option>
+              })}
+            </select>
+            <p className="text-xs text-fgMuted mt-2 font-mono">El bot solo escuchará y responderá en esta sesión.</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono text-fgMuted mb-2">IDENTIFICADOR DEL MODELO (LITELLM)</label>
+            <input 
+              type="text" 
+              placeholder="Ej. gemini/gemini-1.5-pro, groq/llama3-8b-8192" 
+              value={config.ai_model}
+              onChange={e => setConfig({...config, ai_model: e.target.value})}
+              className="w-full bg-surface border border-border p-3 focus:outline-none focus:border-accent text-sm font-mono transition-colors"
+            />
+            <p className="text-xs text-fgMuted mt-2 font-mono">Usa el formato proveedor/modelo compatible con LiteLLM.</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono text-fgMuted mb-2">API KEY DEL PROVEEDOR</label>
+            <input 
+              type="password" 
+              placeholder="sk-..." 
+              value={config.ai_api_key}
+              onChange={e => setConfig({...config, ai_api_key: e.target.value})}
+              className="w-full bg-surface border border-border p-3 focus:outline-none focus:border-accent text-sm font-mono transition-colors"
+            />
+          </div>
+        </div>
+
+        <button onClick={handleSave} className="btn-accent w-full py-3 text-sm tracking-wider uppercase font-mono">
+          Guardar Configuración
+        </button>
+
+        {statusMsg && (
+          <p className={`text-sm font-mono ${statusMsg.includes('Error') ? 'text-danger' : 'text-accent'}`}>
+            {statusMsg}
+          </p>
+        )}
       </div>
     </div>
   );
