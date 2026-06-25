@@ -152,8 +152,8 @@ function OpenWAView() {
         const data = res.data.data || [];
         setSessions(Array.isArray(data) ? data : []);
         if (Array.isArray(data) && data.length > 0) {
-          // OpenWA suele devolver un arreglo de objetos con id o name
-          setSelectedSession(data[0].id || data[0].name || data[0]); 
+          // Usamos el ID interno para las llamadas API
+          setSelectedSession(data[0].id || (typeof data[0] === 'string' ? data[0] : '')); 
         }
       } catch (err) {
         console.error("Error cargando sesiones:", err);
@@ -204,8 +204,9 @@ function OpenWAView() {
             >
               <option value="" disabled>Seleccione una sesión...</option>
               {sessions.map((s, idx) => {
-                const sName = s.id || s.name || (typeof s === 'string' ? s : `Sesion-${idx}`);
-                return <option key={sName} value={sName}>{sName}</option>
+                const val = s.id || (typeof s === 'string' ? s : `Sesion-${idx}`);
+                const display = s.name || val; // Mostramos el nombre, pero usamos el ID
+                return <option key={val} value={val}>{display}</option>
               })}
             </select>
           </div>
