@@ -2,6 +2,7 @@ import traceback
 from flask import Blueprint, request, jsonify
 from app.services.whatsapp_service import WhatsAppService
 from app.services.ai_service import AIService
+from app.extensions import db
 from app.models.base import Configuracion
 from app.models.database_connection import DatabaseConnection
 from app.services.fragmentation_service import get_top_fragmented
@@ -252,3 +253,50 @@ def webhook():
 def list_sessions():
     sessions = wsp_service.get_sessions()
     return jsonify({"status": "success", "data": sessions})
+
+@bp.route('/sessions', methods=['POST'])
+def create_session():
+    data = request.json
+    name = data.get('name')
+    if not name:
+        return jsonify({"error": "El campo 'name' es requerido"}), 400
+    result = wsp_service.create_session(name)
+    if result:
+        return jsonify({"status": "success", "data": result})
+    return jsonify({"error": "Error creando sesión en OpenWA"}), 500
+
+@bp.route('/sessions/<session_id>/start', methods=['POST'])
+def start_session(session_id):
+    result = wsp_service.start_session(session_id)
+    if result:
+        return jsonify({"status": "success", "data": result})
+    return jsonify({"error": "Error iniciando sesión en OpenWA"}), 500
+
+@bp.route('/sessions/<session_id>/qr', methods=['GET'])
+def get_qr(session_id):
+    result = wsp_service.get_qr(session_id)
+    if result:
+        return jsonify({"status": "success", "data": result})
+    return jsonify({"error": "Error obteniendo QR de OpenWA"}), 500
+
+@bp.route('/sessions/<session_id>', methods=['DELETE'])
+def delete_session(session_id):
+    result = wsp_service.delete_session(session_id)
+    if result is not None:
+        return jsonify({"status": "success", "data": result})
+    return jsonify({"error": "Error eliminando sesión en OpenWA"}), 500
+
+@bp.route('/sessions/<session_id>/activate', methods=['POST'])
+def activate_session(session_id):
+    conf = Configuracion.query.filter_by(clave='bot_session').first()
+    if conf:
+        conf.valor = session_id
+    else:
+        conf = Configuracion(clave='bot_session', valor=session_id)
+        db.session.add(conf)
+    try:
+        db.session.commit()
+        return jsonify({"status": "success", "message": f"Sesión {session_id} activada como bot_session"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
