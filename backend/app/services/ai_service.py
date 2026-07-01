@@ -1,5 +1,4 @@
 import os
-from litellm import completion
 from app.models.base import Configuracion
 
 class AIService:
@@ -30,7 +29,7 @@ Responde de manera profesional, concisa y usando terminología técnica adecuada
         messages.append({"role": "user", "content": user_message})
 
         try:
-            # LiteLLM permite pasar la api_key dinámicamente, lo cual es perfecto para multiproveedor
+            from litellm import completion
             response = completion(
                 model=model_name,
                 messages=messages,
