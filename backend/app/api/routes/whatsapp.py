@@ -1,5 +1,5 @@
 import traceback
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from app.services.whatsapp_service import WhatsAppService
 from app.services.ai_service import AIService
 from app.extensions import db
@@ -115,6 +115,12 @@ def _format_alertas():
     ]
     return "\n".join(lines)
 
+def _send_reply(session_id, chat_id, text):
+    try:
+        wsp_service.send_message(session_id, chat_id, text)
+    except Exception as e:
+        print(f"❌ Error enviando respuesta por WhatsApp: {e}")
+
 def _handle_command(text, active_bot_session, chat_id):
     text = text.strip()
     parts = text.split()
@@ -123,7 +129,7 @@ def _handle_command(text, active_bot_session, chat_id):
 
     conn = DatabaseConnection.query.filter_by(is_active=True).first()
     if not conn:
-        wsp_service.send_message(active_bot_session, chat_id,
+        _send_reply(active_bot_session, chat_id,
             "⚠️ No hay una base de datos activa. Configura una desde el dashboard web o usa /alertas para ver opciones.")
         return
 
@@ -132,7 +138,7 @@ def _handle_command(text, active_bot_session, chat_id):
             response = _format_estado(conn)
         except Exception as e:
             response = f"❌ Error al consultar fragmentación: {str(e)}"
-        wsp_service.send_message(active_bot_session, chat_id, response)
+        _send_reply(active_bot_session, chat_id, response)
 
     elif command == '/recomendar':
         table_name = args[0] if args else None
@@ -140,11 +146,11 @@ def _handle_command(text, active_bot_session, chat_id):
             response = _format_recomendar(conn, table_name)
         except Exception as e:
             response = f"❌ Error al generar recomendación: {str(e)}"
-        wsp_service.send_message(active_bot_session, chat_id, response)
+        _send_reply(active_bot_session, chat_id, response)
 
     elif command == '/optimizar':
         if not args:
-            wsp_service.send_message(active_bot_session, chat_id,
+            _send_reply(active_bot_session, chat_id,
                 "⚠️ Debes especificar un nombre de tabla. Ejemplo: /optimizar Ventas")
             return
         table_name = args[0]
@@ -152,7 +158,7 @@ def _handle_command(text, active_bot_session, chat_id):
             response = _format_optimizar(conn, table_name)
         except Exception as e:
             response = f"❌ Error al ejecutar optimización: {str(e)}"
-        wsp_service.send_message(active_bot_session, chat_id, response)
+        _send_reply(active_bot_session, chat_id, response)
 
     elif command == '/historial':
         table_name = args[0] if args else None
@@ -160,18 +166,18 @@ def _handle_command(text, active_bot_session, chat_id):
             response = _format_historial(table_name)
         except Exception as e:
             response = f"❌ Error al consultar historial: {str(e)}"
-        wsp_service.send_message(active_bot_session, chat_id, response)
+        _send_reply(active_bot_session, chat_id, response)
 
     elif command == '/alertas':
         response = _format_alertas()
-        wsp_service.send_message(active_bot_session, chat_id, response)
+        _send_reply(active_bot_session, chat_id, response)
 
     else:
-        wsp_service.send_message(active_bot_session, chat_id,
+        _send_reply(active_bot_session, chat_id,
             f"⚠️ Comando no reconocido: {command}\n"
             f"Comandos disponibles: /estado, /recomendar, /optimizar, /historial, /alertas")
 
-@bp.route('/send', methods=['PsessionOST'])
+@bp.route('/send', methods=['POST'])
 def send_message():
     data = request.json
     phone = data.get('phone')
@@ -182,12 +188,12 @@ def send_message():
         return jsonify({"error": "Faltan los campos 'phone', 'text' o 'session'"}), 400
 
     chat_id = f"{phone}@c.us" if not phone.endswith('@c.us') else phone
-    response = wsp_service.send_message(session_name, chat_id, text)
-
-    if response is not None:
+    try:
+        response = wsp_service.send_message(session_name, chat_id, text)
         return jsonify({"status": "success", "message": "Mensaje despachado a OpenWA", "data": response})
-    else:
-        return jsonify({"error": "Error de comunicación con OpenWA"}), 500
+    except Exception as e:
+        print(f"❌ Error en send_message route: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @bp.route('/webhook', methods=['POST'])
 def webhook():
@@ -196,21 +202,24 @@ def webhook():
     print(f"[WEBHOOK INCOMING] Payload raw:\n{data}")
 
     try:
-        event_type = data.get('event')
+        event_type = data.get('event', '')
         msg_data = data.get('data', {})
         session_id = data.get('sessionId') or data.get('session')
 
         print(f"[WEBHOOK DEBUG] Evento: '{event_type}' | SessionId: '{session_id}'")
 
-        if event_type == 'message.received':
+        is_message_event = event_type.startswith('message.')
+        is_session_event = event_type.startswith('session.')
+
+        if is_message_event:
             if msg_data.get('fromMe'):
-                print("[WEBHOOK DEBUG] Ignorado: fromMe=true")
+                print("[WEBHOOK DEBUG] Ignorado: fromMe=true (mensaje enviado por el bot)")
                 return jsonify({"status": "ignored", "reason": "fromMe"}), 200
 
-            texto_recibido = msg_data.get('body', '') or msg_data.get('text', '')
-            chat_id = msg_data.get('from') or msg_data.get('chatId')
+            texto_recibido = msg_data.get('body', '') or msg_data.get('text', '') or msg_data.get('caption', '')
+            chat_id = msg_data.get('from') or msg_data.get('chatId') or msg_data.get('remoteJid')
 
-            print(f"[WEBHOOK DEBUG] De: '{chat_id}' | Texto: '{texto_recibido}'")
+            print(f"[WEBHOOK DEBUG] De: '{chat_id}' | Texto: '{texto_recibido}' | Tipo: '{event_type}'")
 
             if not texto_recibido or not chat_id:
                 print("[WEBHOOK DEBUG] Ignorado: sin texto o chat_id")
@@ -225,7 +234,6 @@ def webhook():
                 print("[WEBHOOK DEBUG] Ignorado: sesión no coincide con la configurada para el bot")
                 return jsonify({"status": "ignored", "reason": "session mismatch"}), 200
 
-            # Detectar si es un comando "/"
             if texto_recibido.strip().startswith('/'):
                 print(f"[WEBHOOK DEBUG] Comando detectado: {texto_recibido}")
                 _handle_command(texto_recibido, active_bot_session, chat_id)
@@ -233,12 +241,15 @@ def webhook():
                 print("[WEBHOOK DEBUG] Mensaje libre, llamando al LLM...")
                 respuesta_ia = ai_service.generate_response(texto_recibido)
                 print(f"[WEBHOOK DEBUG] IA respondió: {respuesta_ia[:80]}...")
-                wsp_service.send_message(active_bot_session, chat_id, respuesta_ia)
+                _send_reply(active_bot_session, chat_id, respuesta_ia)
 
             print("[WEBHOOK DEBUG] Listo.")
 
+        elif is_session_event:
+            print(f"[WEBHOOK DEBUG] Evento de sesión ignorado (solo log): {event_type}")
+
         else:
-            print(f"[WEBHOOK DEBUG] Evento ignorado: '{event_type}'")
+            print(f"[WEBHOOK DEBUG] Evento desconocido ignorado: '{event_type}'")
 
         print("="*50 + "\n")
         return jsonify({"status": "received"}), 200
@@ -252,7 +263,11 @@ def webhook():
 @bp.route('/sessions', methods=['GET'])
 def list_sessions():
     sessions = wsp_service.get_sessions()
-    return jsonify({"status": "success", "data": sessions})
+    if isinstance(sessions, dict):
+        data = sessions.get('data', sessions)
+    else:
+        data = sessions
+    return jsonify({"status": "success", "data": data})
 
 @bp.route('/sessions', methods=['POST'])
 def create_session():
@@ -262,8 +277,9 @@ def create_session():
         return jsonify({"error": "El campo 'name' es requerido"}), 400
     result = wsp_service.create_session(name)
     if result:
-        return jsonify({"status": "success", "data": result})
-    return jsonify({"error": "Error creando sesión en OpenWA"}), 500
+        session_data = result.get('data', result) if isinstance(result, dict) else result
+        return jsonify({"status": "success", "data": session_data})
+    return jsonify({"error": "Error creando sesión en OpenWA. Verifica que OpenWA esté corriendo y que el nombre no esté duplicado."}), 500
 
 @bp.route('/sessions/<session_id>/start', methods=['POST'])
 def start_session(session_id):
@@ -296,7 +312,14 @@ def activate_session(session_id):
         db.session.add(conf)
     try:
         db.session.commit()
-        return jsonify({"status": "success", "message": f"Sesión {session_id} activada como bot_session"})
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+    webhook_url = current_app.config.get('WA_WEBHOOK_URL', '')
+    if webhook_url:
+        wsp_service.register_webhook(session_id, webhook_url)
+    else:
+        print("⚠️ WA_WEBHOOK_URL no configurada — webhook no registrado en OpenWA")
+
+    return jsonify({"status": "success", "message": f"Sesión {session_id} activada como bot_session"})

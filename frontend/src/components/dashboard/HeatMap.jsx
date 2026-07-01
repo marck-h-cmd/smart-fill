@@ -23,8 +23,8 @@ export default function HeatMap({ data = [] }) {
     <div className="panel p-6">
       <h3 className="text-sm font-mono text-fgMuted uppercase tracking-wider mb-4">Mapa de Calor - Fragmentación por Tabla</h3>
       <div className="space-y-2">
-        {data.map((item) => (
-          <div key={item.table_name} className="flex items-center gap-3">
+        {data.map((item, idx) => (
+          <div key={`${item.table_name}-${idx}`} className="flex items-center gap-3">
             <span className="w-32 text-sm font-mono truncate text-fgMuted">{item.table_name}</span>
             <div className="flex-1 bg-border rounded-full h-5 overflow-hidden">
               <div

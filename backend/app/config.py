@@ -8,6 +8,7 @@ class Config:
     # Para SQLite (archivo en la carpeta backend)
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///smartfill.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    # Configuración de WhatsApp (si la tienes)
+    # Configuración de WhatsApp / OpenWA
     WA_API_URL = os.getenv('WA_API_URL', 'http://localhost:2785')
     WA_API_KEY = os.getenv('WA_API_KEY', '')
+    WA_WEBHOOK_URL = os.getenv('WA_WEBHOOK_URL', 'http://localhost:5000/api/whatsapp/webhook')

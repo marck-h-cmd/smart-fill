@@ -30,7 +30,8 @@ export default function WhatsAppSessionManager() {
     setStatusMsg('');
     try {
       const result = await whatsapp.createSession(newName.trim());
-      const sessionId = result?.data?.id || result?.data?.name || newName.trim();
+      const sessionData = result?.data;
+      const sessionId = sessionData?.name || sessionData?.id || newName.trim();
       setStatusMsg(`Sesión "${newName}" creada. Iniciando...`);
       setNewName('');
       await whatsapp.startSession(sessionId);
@@ -86,8 +87,9 @@ export default function WhatsAppSessionManager() {
 
   const getSessionStatus = (session) => {
     const state = (session.state || session.status || '').toLowerCase();
-    if (state === 'connected' || state === 'open' || state === 'activo') return 'connected';
-    if (state === 'connecting' || state === 'loading' || state === 'scanning') return 'connecting';
+    if (state === 'connected' || state === 'open' || state === 'activo' || state === 'ready' || state === 'authenticated') return 'connected';
+    if (state === 'connecting' || state === 'loading' || state === 'scanning' || state === 'authenticating') return 'connecting';
+    if (state === 'disconnected' || state === 'failed' || state === 'error' || state === 'created') return 'disconnected';
     return 'disconnected';
   };
 
@@ -144,7 +146,7 @@ export default function WhatsAppSessionManager() {
       ) : (
         <div className="space-y-2">
           {sessions.map((s, idx) => {
-            const sessionId = s.id || s.name || (typeof s === 'string' ? s : `session-${idx}`);
+            const sessionId = s.name || s.id || (typeof s === 'string' ? s : `session-${idx}`);
             const displayName = s.name || sessionId;
             const status = getSessionStatus(s);
             const isActive = activeSession === sessionId;

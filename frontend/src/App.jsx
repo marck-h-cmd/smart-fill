@@ -486,7 +486,7 @@ function OpenWAView() {
       const data = res.data.data || [];
       setSessions(Array.isArray(data) ? data : []);
       if (Array.isArray(data) && data.length > 0) {
-        setSelectedSession(data[0].id || (typeof data[0] === 'string' ? data[0] : ''));
+        setSelectedSession(data[0].name || data[0].id || (typeof data[0] === 'string' ? data[0] : ''));
       }
     }).catch(console.error);
   }, []);
@@ -518,7 +518,7 @@ function OpenWAView() {
             className="w-full bg-surface border border-border p-3 focus:outline-none focus:border-accent text-sm font-mono">
             <option value="">Seleccionar sesión...</option>
             {sessions.map((s, idx) => {
-              const val = s.id || (typeof s === 'string' ? s : `sesion-${idx}`);
+              const val = s.name || s.id || (typeof s === 'string' ? s : `sesion-${idx}`);
               const display = s.name || val;
               return <option key={val} value={val}>{display}</option>;
             })}
@@ -588,7 +588,7 @@ function AIConfigView() {
             className="w-full bg-surface border border-border p-3 focus:outline-none focus:border-accent text-sm font-mono">
             <option value="">Ninguna (bot desactivado)</option>
             {sessions.map((s, idx) => {
-              const val = s.id || (typeof s === 'string' ? s : `sesion-${idx}`);
+              const val = s.name || s.id || (typeof s === 'string' ? s : `sesion-${idx}`);
               return <option key={val} value={val}>{s.name || val}</option>;
             })}
           </select>
