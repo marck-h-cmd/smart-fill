@@ -4,7 +4,7 @@ from app.models.base import Configuracion
 
 app = create_app()
 with app.app_context():
-    session_id = '23af2849-54e7-4a54-826c-a2ef14ba07bd'
+    session_id = 'f66a017c-2985-41bb-9722-04183ef16767'
     config = Configuracion.query.filter_by(clave='bot_session').first()
     if config:
         config.valor = session_id

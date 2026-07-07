@@ -72,8 +72,9 @@ def recommend_for_table(conn, table_name):
             frag_result = c.execute(text("""
                 SELECT TOP 1
                     ips.avg_fragmentation_in_percent AS fragmentation_percent,
-                    ips.fill_factor AS current_fillfactor
+                    i.fill_factor AS current_fillfactor
                 FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED') ips
+                JOIN sys.indexes i ON ips.object_id = i.object_id AND ips.index_id = i.index_id
                 WHERE ips.index_id > 0
                   AND ips.alloc_unit_type_desc = 'IN_ROW_DATA'
                   AND OBJECTPROPERTY(ips.object_id, 'IsUserTable') = 1

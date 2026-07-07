@@ -168,3 +168,25 @@ def get_dashboard_stats(conn):
             }
     finally:
         engine.dispose()
+
+ALL_USER_TABLES_QUERY = text("""
+SELECT
+    t.name AS table_name,
+    SUM(p.rows) AS total_rows
+FROM sys.tables t
+JOIN sys.partitions p ON t.object_id = p.object_id
+WHERE t.is_ms_shipped = 0
+  AND t.name NOT LIKE 'sys%'
+  AND t.name NOT LIKE 'MS%'
+GROUP BY t.name, t.object_id
+ORDER BY t.name
+""")
+
+def get_all_user_tables(conn):
+    engine = get_engine_from_conn(conn)
+    try:
+        with engine.connect() as c:
+            result = c.execute(ALL_USER_TABLES_QUERY)
+            return [dict(r._mapping) for r in result]
+    finally:
+        engine.dispose()

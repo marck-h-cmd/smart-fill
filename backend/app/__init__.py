@@ -1,6 +1,8 @@
+import atexit
 from flask import Flask
 from flask_cors import CORS
 from app.extensions import db
+from app.services.scheduler_service import start_scheduler, stop_scheduler
 
 def create_app():
     app = Flask(__name__)
@@ -14,5 +16,10 @@ def create_app():
     app.register_blueprint(whatsapp.bp)
     app.register_blueprint(config_routes.bp)
     app.register_blueprint(databases.bp)
+
+    with app.app_context():
+        start_scheduler()
+
+    atexit.register(stop_scheduler)
 
     return app

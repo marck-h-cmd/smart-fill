@@ -14,7 +14,7 @@ class WhatsAppService:
         if not self.api_key:
             raise Exception("WA_API_KEY no configurada")
 
-        if not chat_id.endswith('@c.us') and not chat_id.endswith('@lid'):
+        if not chat_id.endswith('@c.us') and not chat_id.endswith('@lid') and not chat_id.endswith('@g.us'):
             chat_id = f"{chat_id}@c.us"
 
         url = f"{self.api_url}/api/sessions/{session_id}/messages/send-text"
@@ -116,6 +116,26 @@ class WhatsAppService:
         if not webhook_url:
             print("❌ WA_WEBHOOK_URL no configurada")
             return None
+        # Eliminar webhooks existentes con la misma URL para evitar duplicados
+        list_url = f"{self.api_url}/api/sessions/{session_id}/webhooks"
+        try:
+            existing = requests.get(list_url, headers=self.headers)
+            if existing.status_code == 200:
+                webhooks = existing.json()
+                if isinstance(webhooks, dict):
+                    webhooks = webhooks.get('data', webhooks.get('webhooks', []))
+                for wh in (webhooks if isinstance(webhooks, list) else []):
+                    wh_url = wh.get('url') or wh.get('webhookUrl') or ''
+                    wh_id = wh.get('id') or wh.get('_id') or ''
+                    if wh_url == webhook_url and wh_id:
+                        del_url = f"{list_url}/{wh_id}"
+                        try:
+                            requests.delete(del_url, headers=self.headers)
+                            print(f"   ↳ Webhook existente eliminado: {wh_id}")
+                        except Exception:
+                            pass
+        except Exception as e:
+            print(f"   ↳ Error al listar webhooks existentes (no crítico): {e}")
         url = f"{self.api_url}/api/sessions/{session_id}/webhooks"
         payload = {
             "url": webhook_url,
@@ -136,6 +156,31 @@ class WhatsAppService:
         except requests.exceptions.RequestException as e:
             print(f"❌ Error de conexión registrando webhook: {e}")
             return None
+
+    def get_chats(self, session_id):
+        url = f"{self.api_url}/api/sessions/{session_id}/chats"
+        try:
+            response = requests.get(url, headers=self.headers, timeout=15)
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, list):
+                chats = []
+                for c in data:
+                    name = c.get('name') or c.get('pushName') or ''
+                    if not name:
+                        name = c.get('id', '').split('@')[0]
+                    chats.append({
+                        "id": c.get('id'),
+                        "name": name,
+                        "isGroup": c.get('isGroup', False)
+                    })
+                return chats
+            return []
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error obteniendo chats: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"   Respuesta: {e.response.text}")
+            return []
 
     def delete_session(self, session_id):
         url = f"{self.api_url}/api/sessions/{session_id}"

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from app.extensions import db
 from app.models.database_connection import DatabaseConnection
-from app.services.database_service import encrypt_password, test_connection
+from app.services.database_service import encrypt_password, test_connection, test_raw_connection, get_available_databases
 from app.services.fragmentation_service import get_top_fragmented, get_all_fragmented, get_dashboard_stats
 
 bp = Blueprint('databases', __name__, url_prefix='/api/databases')
@@ -83,6 +83,49 @@ def delete_database(db_id):
     db.session.delete(conn)
     db.session.commit()
     return jsonify({'status': 'success', 'message': 'Conexión eliminada'})
+
+@bp.route('/explore', methods=['POST'])
+def explore_databases():
+    data = request.json
+    required = ['host', 'username', 'password']
+    missing = [f for f in required if f not in data]
+    if missing:
+        return jsonify({'error': f'Campos requeridos: {", ".join(missing)}'}), 400
+
+    success, result = get_available_databases(
+        host=data['host'],
+        port=data.get('port', 1433),
+        username=data['username'],
+        password=data['password'],
+        driver=data.get('driver', 'ODBC Driver 17 for SQL Server')
+    )
+    if success:
+        return jsonify({'status': 'success', 'data': result})
+    else:
+        return jsonify({'status': 'error', 'message': result}), 400
+
+
+@bp.route('/test-raw', methods=['POST'])
+def test_raw():
+    data = request.json
+    required = ['host', 'username', 'password']
+    missing = [f for f in required if f not in data]
+    if missing:
+        return jsonify({'error': f'Campos requeridos: {", ".join(missing)}'}), 400
+
+    success, message = test_raw_connection(
+        host=data['host'],
+        port=data.get('port', 1433),
+        username=data['username'],
+        password=data['password'],
+        driver=data.get('driver', 'ODBC Driver 17 for SQL Server')
+    )
+    return jsonify({
+        'status': 'success' if success else 'error',
+        'connected': success,
+        'message': message
+    })
+
 
 @bp.route('/<int:db_id>/test', methods=['POST'])
 def test_database(db_id):

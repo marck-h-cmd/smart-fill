@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sun, Moon, Activity, Database, Smartphone, BarChart3, Clock, FileText, Wrench, MessageSquare, Cpu } from 'lucide-react';
 import axios from 'axios';
+import 'flag-icons/css/flag-icons.min.css';
 import KPICard from './components/dashboard/KPICard';
 import HeatMap from './components/dashboard/HeatMap';
 import TrendChart from './components/dashboard/TrendChart';
 import DatabaseConfig from './components/configuration/DatabaseConfig';
 import WhatsAppSessionManager from './components/whatsapp/WhatsAppSessionManager';
+import MonitoringView from './pages/Monitoring';
 import { databases } from './services/apiClient';
 
 function App() {
@@ -34,6 +36,7 @@ function App() {
             <NavTab label="HISTORIAL" view="history" current={activeView} set={setActiveView} icon={<Clock size={14} />} />
             <NavTab label="REPORTES" view="reports" current={activeView} set={setActiveView} icon={<FileText size={14} />} />
             <NavTab label="MANTENIMIENTO" view="maintenance" current={activeView} set={setActiveView} icon={<Wrench size={14} />} />
+            <NavTab label="MONITOREO" view="monitoring" current={activeView} set={setActiveView} icon={<Activity size={14} />} />
             <NavTab label="OPENWA" view="openwa" current={activeView} set={setActiveView} icon={<MessageSquare size={14} />} />
             <NavTab label="IA" view="ai_config" current={activeView} set={setActiveView} icon={<Cpu size={14} />} />
           </nav>
@@ -57,6 +60,7 @@ function App() {
             {activeView === 'history' && <HistoryView />}
             {activeView === 'reports' && <ReportsView />}
             {activeView === 'maintenance' && <MaintenanceView />}
+            {activeView === 'monitoring' && <MonitoringView />}
             {activeView === 'openwa' && <OpenWAView />}
             {activeView === 'ai_config' && <AIConfigView />}
           </div>
@@ -85,6 +89,7 @@ function SidebarContent({ activeView, setActiveView, configTab, setConfigTab }) 
     { view: 'history', label: 'Historial', icon: Clock },
     { view: 'reports', label: 'Reportes', icon: FileText },
     { view: 'maintenance', label: 'Mantenimiento', icon: Wrench },
+    { view: 'monitoring', label: 'Monitoreo', icon: Activity },
     { view: 'openwa', label: 'Puente OpenWA', icon: MessageSquare },
     { view: 'ai_config', label: 'Configuración IA', icon: Cpu },
   ];
@@ -474,12 +479,47 @@ function AutomationConfig() {
   );
 }
 
+const COUNTRIES = [
+  { code: '+51', iso: 'pe', name: 'Perú' },
+  { code: '+52', iso: 'mx', name: 'México' },
+  { code: '+54', iso: 'ar', name: 'Argentina' },
+  { code: '+57', iso: 'co', name: 'Colombia' },
+  { code: '+56', iso: 'cl', name: 'Chile' },
+  { code: '+34', iso: 'es', name: 'España' },
+  { code: '+1', iso: 'us', name: 'EE.UU./Canadá' },
+  { code: '+58', iso: 've', name: 'Venezuela' },
+  { code: '+593', iso: 'ec', name: 'Ecuador' },
+  { code: '+591', iso: 'bo', name: 'Bolivia' },
+  { code: '+595', iso: 'py', name: 'Paraguay' },
+  { code: '+598', iso: 'uy', name: 'Uruguay' },
+  { code: '+506', iso: 'cr', name: 'Costa Rica' },
+  { code: '+502', iso: 'gt', name: 'Guatemala' },
+  { code: '+507', iso: 'pa', name: 'Panamá' },
+  { code: '+53', iso: 'cu', name: 'Cuba' },
+  { code: '+55', iso: 'br', name: 'Brasil' },
+  { code: '+44', iso: 'gb', name: 'Reino Unido' },
+  { code: '+39', iso: 'it', name: 'Italia' },
+  { code: '+49', iso: 'de', name: 'Alemania' },
+  { code: '+33', iso: 'fr', name: 'Francia' },
+];
+
 function OpenWAView() {
-  const [phone, setPhone] = useState('');
+  const [localPhone, setLocalPhone] = useState('');
+  const [countryCode, setCountryCode] = useState('+51');
   const [message, setMessage] = useState('');
   const [log, setLog] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState('');
+  const [countryOpen, setCountryOpen] = useState(false);
+  const countryRef = useRef(null);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (countryRef.current && !countryRef.current.contains(e.target)) setCountryOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   useEffect(() => {
     axios.get('http://localhost:5000/api/whatsapp/sessions').then(res => {
@@ -491,14 +531,17 @@ function OpenWAView() {
     }).catch(console.error);
   }, []);
 
+  const selectedCountry = COUNTRIES.find(c => c.code === countryCode) || COUNTRIES[0];
+
   const handleSend = async () => {
-    if (!phone || !message || !selectedSession) {
+    if (!localPhone || !message || !selectedSession) {
       setLog(prev => [...prev, `[RX] ERROR: Completa todos los campos.`]);
       return;
     }
-    setLog(prev => [...prev, `[TX] Enviando a ${phone} vía sesión '${selectedSession}'...`]);
+    const fullPhone = `${countryCode}${localPhone}`;
+    setLog(prev => [...prev, `[TX] Enviando a ${fullPhone} vía sesión '${selectedSession}'...`]);
     try {
-      await axios.post('http://localhost:5000/api/whatsapp/send', { session: selectedSession, phone, text: message });
+      await axios.post('http://localhost:5000/api/whatsapp/send', { session: selectedSession, phone: fullPhone, text: message });
       setLog(prev => [...prev, `[RX] Mensaje enviado correctamente.`]);
       setMessage('');
     } catch (err) {
@@ -524,10 +567,32 @@ function OpenWAView() {
             })}
           </select>
         </div>
-        <div>
+        <div ref={countryRef}>
           <label className="block text-xs font-mono text-fgMuted mb-2">NÚMERO DESTINO</label>
-          <input type="text" placeholder="Ej. 51999999999" value={phone} onChange={e => setPhone(e.target.value)}
-            className="w-full bg-surface border border-border p-3 focus:outline-none focus:border-accent text-sm font-mono" />
+          <div className="flex gap-2">
+            <div className="relative w-[180px] shrink-0">
+              <button type="button" onClick={() => setCountryOpen(o => !o)}
+                className="w-full bg-surface border border-border p-3 focus:outline-none focus:border-accent text-sm font-mono flex items-center gap-2 cursor-pointer text-left">
+                <span className={`fi fi-${selectedCountry.iso} text-lg`}></span>
+                <span>{selectedCountry.code}</span>
+                <span className="ml-auto text-fgMuted text-xs">{countryOpen ? '▲' : '▼'}</span>
+              </button>
+              {countryOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border max-h-56 overflow-y-auto z-50 shadow-lg">
+                  {COUNTRIES.map(c => (
+                    <button key={c.code} type="button" onClick={() => { setCountryCode(c.code); setCountryOpen(false); }}
+                      className={`w-full px-3 py-2 text-sm font-mono flex items-center gap-2 cursor-pointer text-left hover:bg-accent/10 ${c.code === countryCode ? 'bg-accent/10' : ''}`}>
+                      <span className={`fi fi-${c.iso} text-lg`}></span>
+                      <span>{c.code}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <input type="text" inputMode="numeric" pattern="[0-9]*"
+              placeholder="Ej. 970292710" value={localPhone} onChange={e => setLocalPhone(e.target.value.replace(/\D/g, ''))}
+              className="flex-1 bg-surface border border-border p-3 focus:outline-none focus:border-accent text-sm font-mono" />
+          </div>
         </div>
         <div>
           <label className="block text-xs font-mono text-fgMuted mb-2">MENSAJE</label>
@@ -561,14 +626,17 @@ function AIConfigView() {
       setSessions(Array.isArray(res.data.data) ? res.data.data : [])
     ).catch(console.error);
     axios.get('http://localhost:5000/api/config').then(res => {
-      if (res.data.data) setConfig(prev => ({ ...prev, ...res.data.data }));
+      if (res.data.data) {
+        setConfig(prev => ({ ...prev, ...res.data.data }));
+      }
     }).catch(console.error);
   }, []);
 
   const handleSave = async () => {
     setStatusMsg('Guardando...');
     try {
-      await axios.post('http://localhost:5000/api/config', config);
+      const payload = { bot_session: config.bot_session, ai_model: config.ai_model, ai_api_key: config.ai_api_key };
+      await axios.post('http://localhost:5000/api/config', payload);
       setStatusMsg('Configuración guardada.');
       setTimeout(() => setStatusMsg(''), 3000);
     } catch (err) {
@@ -579,7 +647,7 @@ function AIConfigView() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-2xl">
       <h2 className="text-3xl font-light tracking-tight mb-2">Configuración del Motor IA</h2>
-      <p className="text-fgMuted">Parámetros del LLM y sesión asignada al bot de WhatsApp.</p>
+      <p className="text-fgMuted">Parámetros del LLM para el asistente inteligente.</p>
 
       <div className="panel p-6 space-y-6">
         <div>
@@ -588,8 +656,8 @@ function AIConfigView() {
             className="w-full bg-surface border border-border p-3 focus:outline-none focus:border-accent text-sm font-mono">
             <option value="">Ninguna (bot desactivado)</option>
             {sessions.map((s, idx) => {
-              const val = s.name || s.id || (typeof s === 'string' ? s : `sesion-${idx}`);
-              return <option key={val} value={val}>{s.name || val}</option>;
+              const sid = s.id || `temp-${idx}`;
+              return <option key={sid} value={sid}>{s.name || sid}</option>;
             })}
           </select>
         </div>
@@ -603,7 +671,7 @@ function AIConfigView() {
           <input type="password" placeholder="sk-..." value={config.ai_api_key} onChange={e => setConfig({...config, ai_api_key: e.target.value})}
             className="w-full bg-surface border border-border p-3 focus:outline-none focus:border-accent text-sm font-mono" />
         </div>
-        <button onClick={handleSave} className="btn-accent w-full py-3 text-sm tracking-wider uppercase font-mono">Guardar Configuración</button>
+        <button onClick={handleSave} className="btn-accent w-full py-3 text-sm tracking-wider uppercase font-mono">Guardar Configuración IA</button>
         {statusMsg && <p className={`text-sm font-mono ${statusMsg.includes('Error') ? 'text-red-400' : 'text-accent'}`}>{statusMsg}</p>}
       </div>
     </div>
