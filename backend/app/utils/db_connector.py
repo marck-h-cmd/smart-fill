@@ -1,21 +1,9 @@
-import pyodbc
-from flask import current_app, g
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
+# Archivo temporalmente deshabilitado durante las Fases 1 y 2.
+# En la Fase 3, SQLAlchemy manejará la conexión a SQL Server nativamente 
+# o reactivaremos pyodbc si se necesita ejecutar comandos nativos (como Agent Jobs).
 
 def get_db_connection():
-    if 'db' not in g:
-        conn_str = os.getenv('DATABASE_URL')
-        # Si usas SQLAlchemy, podrías usar create_engine, pero aquí usamos pyodbc directo
-        g.db = pyodbc.connect(conn_str)
-    return g.db
-
-def close_db(e=None):
-    db = g.pop('db', None)
-    if db is not None:
-        db.close()
+    pass
 
 def init_db(app):
-    app.teardown_appcontext(close_db)
+    pass

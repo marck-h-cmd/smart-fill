@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* RGB channels para permitir modificadores de opacidad en Tailwind (ej. bg-panel/50) */
+    --color-surface: 248 250 252; /* #f8fafc */
+    --color-panel: 255 255 255;   /* #ffffff */
+    --color-fg: 15 23 42;         /* #0f172a */
+    --color-fg-muted: 100 116 139;/* #64748b */
+    --color-border: 226 232 240;  /* #e2e8f0 */
+    --color-accent: 2 132 199;    /* #0284c7 */
+  }
+
+  .dark {
+    --color-surface: 10 10 10;    /* #0a0a0a */
+    --color-panel: 17 17 17;      /* #111111 */
+    --color-fg: 237 237 237;      /* #ededed */
+    --color-fg-muted: 136 136 136;/* #888888 */
+    --color-border: 34 34 34;     /* #222222 */
+    --color-accent: 0 240 255;    /* #00F0FF */
+  }
+
+  body {
+    @apply bg-surface text-fg antialiased transition-colors duration-300 selection:bg-accent/30 selection:text-accent;
+  }
+}
+
+@layer utilities {
+  .hairline-b { @apply border-b border-border; }
+  .hairline-r { @apply border-r border-border; }
+  .hairline-t { @apply border-t border-border; }
+  .hairline-l { @apply border-l border-border; }
+  
+  .panel {
+    @apply bg-panel border border-border transition-colors duration-300;
+  }
+  
+  .btn-accent {
+    @apply bg-accent text-white dark:text-surface font-medium hover:opacity-90 transition-all active:scale-[0.98];
+  }
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-border hover:bg-fgMuted transition-colors;
+}

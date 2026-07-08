@@ -17,6 +17,14 @@ htmlcov/
 .env
 .env.*
 *.env
+.flaskenv
+
+# Python version (pyenv)
+.python-version
+
+# opencode config
+.agents/
+skills-lock.json
 
 # Database / local data
 *.sqlite3
@@ -42,3 +50,5 @@ pnpm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+docs/

@@ -1,0 +1,142 @@
+from sqlalchemy import text
+from app.services.database_service import get_engine_from_conn
+
+FRAGMENTATION_CHECK_QUERY = text("""
+SELECT
+    OBJECT_NAME(ips.object_id) AS table_name,
+    i.name AS index_name,
+    ips.avg_fragmentation_in_percent AS fragmentation_percent,
+    ps.row_count AS total_rows,
+    CASE
+        WHEN ips.avg_fragmentation_in_percent >= 30 THEN 'REBUILD'
+        WHEN ips.avg_fragmentation_in_percent >= 10 THEN 'REORGANIZE'
+        ELSE 'OK'
+    END AS suggested_action,
+    i.fill_factor AS current_fillfactor
+FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED') ips
+JOIN sys.indexes i ON ips.object_id = i.object_id AND ips.index_id = i.index_id
+JOIN (
+    SELECT object_id, SUM(row_count) AS row_count
+    FROM sys.dm_db_partition_stats
+    WHERE index_id <= 1
+    GROUP BY object_id
+) ps ON ips.object_id = ps.object_id
+WHERE ips.avg_fragmentation_in_percent > 0
+  AND ips.index_id > 0
+  AND ips.alloc_unit_type_desc = 'IN_ROW_DATA'
+  AND OBJECTPROPERTY(ips.object_id, 'IsUserTable') = 1
+ORDER BY ips.avg_fragmentation_in_percent DESC
+""")
+
+DB_SPACE_QUERY = text("""
+SELECT
+    name,
+    type_desc,
+    size/128.0 AS total_size_mb,
+    CAST(FILEPROPERTY(name, 'SpaceUsed') AS INT)/128.0 AS used_size_mb,
+    size/128.0 - CAST(FILEPROPERTY(name, 'SpaceUsed') AS INT)/128.0 AS free_size_mb,
+    CASE
+        WHEN max_size = -1 THEN -1
+        ELSE max_size/128.0
+    END AS max_size_mb
+FROM sys.database_files
+""")
+
+
+def check_fragmentation(conn, umbral=30):
+    try:
+        engine = get_engine_from_conn(conn)
+        with engine.connect() as c:
+            result = c.execute(FRAGMENTATION_CHECK_QUERY)
+            rows = [dict(r._mapping) for r in result]
+        engine.dispose()
+        critical = [r for r in rows if r['fragmentation_percent'] >= umbral]
+        moderate = [r for r in rows if umbral > r['fragmentation_percent'] >= 10]
+        return {
+            "status": "success",
+            "total_indexes": len(rows),
+            "critical_count": len(critical),
+            "moderate_count": len(moderate),
+            "healthy_count": len(rows) - len(critical) - len(moderate),
+            "critical": critical,
+            "moderate": moderate,
+            "all": rows
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def check_database_space(conn):
+    try:
+        engine = get_engine_from_conn(conn)
+        with engine.connect() as c:
+            result = c.execute(DB_SPACE_QUERY)
+            files = [dict(r._mapping) for r in result]
+        engine.dispose()
+        total_used = sum(f['used_size_mb'] for f in files if f['used_size_mb'])
+        total_size = sum(f['total_size_mb'] for f in files if f['total_size_mb'])
+        total_max = sum(f['max_size_mb'] for f in files if f['max_size_mb'] and f['max_size_mb'] > 0)
+        unlimited = any(f['max_size_mb'] == -1 for f in files)
+        used_percent = round((total_used / total_size) * 100, 2) if total_size > 0 else 0
+        return {
+            "status": "success",
+            "files": files,
+            "total_used_mb": round(total_used, 2),
+            "total_size_mb": round(total_size, 2),
+            "used_percent": used_percent,
+            "free_mb": round(total_size - total_used, 2),
+            "has_autogrow": unlimited,
+            "max_size_mb": round(total_max, 2) if not unlimited else "Sin límite"
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def run_full_check(conn, alert_umbral=30):
+    frag_result = check_fragmentation(conn, alert_umbral)
+    space_result = check_database_space(conn)
+    alerts = []
+    if frag_result.get('status') == 'success':
+        if frag_result['critical_count'] > 0:
+            alerts.append({
+                "type": "fragmentation",
+                "severity": "critical",
+                "message": f"{frag_result['critical_count']} índice(s) con fragmentación ≥{alert_umbral}%",
+                "count": frag_result['critical_count'],
+                "items": frag_result['critical']
+            })
+        if frag_result['moderate_count'] > 0:
+            alerts.append({
+                "type": "fragmentation",
+                "severity": "moderate",
+                "message": f"{frag_result['moderate_count']} índice(s) con fragmentación entre 10% y {alert_umbral}%",
+                "count": frag_result['moderate_count'],
+                "items": frag_result['moderate']
+            })
+    if space_result.get('status') == 'success':
+        if space_result['used_percent'] >= 90:
+            alerts.append({
+                "type": "space",
+                "severity": "critical",
+                "message": f"Espacio usado al {space_result['used_percent']}% — {space_result['free_mb']} MB libres",
+                "used_percent": space_result['used_percent'],
+                "free_mb": space_result['free_mb']
+            })
+        elif space_result['used_percent'] >= 75:
+            alerts.append({
+                "type": "space",
+                "severity": "warning",
+                "message": f"Espacio usado al {space_result['used_percent']}% — {space_result['free_mb']} MB libres",
+                "used_percent": space_result['used_percent'],
+                "free_mb": space_result['free_mb']
+            })
+    return {
+        "status": "success",
+        "database": conn.database,
+        "timestamp": __import__('datetime').datetime.utcnow().isoformat(),
+        "has_alerts": len(alerts) > 0,
+        "alert_count": len(alerts),
+        "alerts": alerts,
+        "fragmentation": frag_result,
+        "space": space_result
+    }
