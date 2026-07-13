@@ -23,8 +23,8 @@ function App() {
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
   return (
-    <div className="min-h-screen bg-surface text-fg font-sans flex flex-col transition-colors duration-300">
-      <header className="h-14 hairline-b flex items-center justify-between px-6 bg-surface z-10 transition-colors duration-300">
+    <div className="h-screen overflow-hidden bg-surface text-fg font-sans flex flex-col transition-colors duration-300">
+      <header className="shrink-0 h-14 hairline-b flex items-center justify-between px-6 bg-surface z-10 transition-colors duration-300">
         <div className="flex items-center gap-4">
           <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />
           <h1 className="font-medium tracking-wide">SmartFill</h1>
