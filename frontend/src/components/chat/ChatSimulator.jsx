@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Loader2, Zap, Database } from 'lucide-react';
+import { Streamdown } from 'streamdown';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -147,9 +148,15 @@ export default function ChatSimulator() {
                 ? 'bg-accent text-white rounded-br-sm'
                 : msg.role === 'error'
                 ? 'bg-red-500/15 text-red-300 border border-red-500/30 rounded-bl-sm'
-                : 'bg-surface border border-border text-fg rounded-bl-sm'
+                : 'bg-surface border border-border text-fg rounded-bl-sm overflow-hidden'
             }`}>
-              <p className="whitespace-pre-wrap">{msg.content}</p>
+              {msg.role === 'user' || msg.role === 'error' ? (
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              ) : (
+                <div className="w-full max-w-none [&_pre]:bg-background/50 [&_pre]:border [&_pre]:border-border [&_code]:text-accent">
+                  <Streamdown>{msg.content}</Streamdown>
+                </div>
+              )}
               {msg.streaming && msg.content === '' && (
                 <span className="inline-flex gap-1">
                   <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce" style={{animationDelay: '0ms'}} />
