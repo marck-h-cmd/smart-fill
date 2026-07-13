@@ -123,8 +123,12 @@ export default function DatabaseConfig() {
     }
   };
 
-  const handleExplore = async () => {
-    if (!form.host || !form.username || !form.password) return;
+  const handleExplore = async (e) => {
+    if (e) e.preventDefault();
+    if (!form.host || !form.username || !form.password) {
+      setExploreError('⚠️ Llena el servidor, usuario y contraseña primero para buscar.');
+      return;
+    }
     setLoadingDbs(true);
     setExploreError('');
     setAvailableDbs([]);
@@ -230,7 +234,7 @@ export default function DatabaseConfig() {
                       placeholder="Escribe o carga BD disponibles"
                       className="flex-1 bg-surface border border-border p-3 focus:outline-none focus:border-accent text-sm font-mono" />
                   )}
-                  <button onClick={handleExplore} disabled={loadingDbs || !form.host || !form.username || !form.password}
+                  <button onClick={handleExplore} disabled={loadingDbs} type="button"
                     className="px-3 bg-surface border border-border hover:border-accent text-fgMuted hover:text-accent transition-colors disabled:opacity-50"
                     title="Cargar bases de datos disponibles">
                     {loadingDbs ? (

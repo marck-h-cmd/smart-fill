@@ -265,6 +265,41 @@ def send_message():
         print(f"❌ Error en send_message route: {e}")
         return jsonify({"error": str(e)}), 500
 
+@bp.route('/chat-test', methods=['POST'])
+def chat_test():
+    from flask import Response, stream_with_context
+    from app.services.ai_service import _build_db_context_fast, _get_cached_db_context
+    data = request.json
+    user_text = data.get('text', '').strip()
+    if not user_text:
+        return jsonify({"error": "Texto vacío"}), 400
+
+    conn = DatabaseConnection.query.filter_by(is_active=True).first()
+    db_str = _get_cached_db_context(conn.id, lambda: _build_db_context_fast(conn)) if conn else ""
+    chat_str = context_service.get_context("TEST_GUI")
+    context_service.add_event("TEST_GUI", "message", user_text)
+
+    def generate():
+        full_response = []
+        for chunk in ai_service.generate_response_stream(user_text, db_context=db_str, chat_context=chat_str):
+            full_response.append(chunk)
+            yield chunk
+        response_text = "".join(
+            c.replace("data: ", "").replace("\\n", "\n").strip()
+            for c in full_response
+            if c.startswith("data: ") and "__END__" not in c and "__TOOL__" not in c
+        )
+        context_service.add_event("TEST_GUI", "ai_response", response_text[:300])
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
 @bp.route('/webhook', methods=['POST'])
 def webhook():
     data = request.json
@@ -377,12 +412,16 @@ def webhook():
 
 @bp.route('/sessions', methods=['GET'])
 def list_sessions():
-    sessions = wsp_service.get_sessions()
-    if isinstance(sessions, dict):
-        data = sessions.get('data', sessions)
-    else:
-        data = sessions
-    return jsonify({"status": "success", "data": data})
+    try:
+        sessions = wsp_service.get_sessions()
+        if isinstance(sessions, dict):
+            data = sessions.get('data', sessions)
+        else:
+            data = sessions
+        return jsonify({"status": "success", "data": data})
+    except Exception as e:
+        print(f"⚠️ OpenWA apagado (ignorando error): {str(e)[:100]}")
+        return jsonify({"status": "success", "data": []})
 
 @bp.route('/sessions', methods=['POST'])
 def create_session():

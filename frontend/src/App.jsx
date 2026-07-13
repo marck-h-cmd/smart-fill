@@ -8,6 +8,7 @@ import TrendChart from './components/dashboard/TrendChart';
 import DatabaseConfig from './components/configuration/DatabaseConfig';
 import WhatsAppSessionManager from './components/whatsapp/WhatsAppSessionManager';
 import MonitoringView from './pages/Monitoring';
+import ChatSimulator from './components/chat/ChatSimulator';
 import { databases } from './services/apiClient';
 
 function App() {
@@ -38,7 +39,8 @@ function App() {
             <NavTab label="MANTENIMIENTO" view="maintenance" current={activeView} set={setActiveView} icon={<Wrench size={14} />} />
             <NavTab label="MONITOREO" view="monitoring" current={activeView} set={setActiveView} icon={<Activity size={14} />} />
             <NavTab label="OPENWA" view="openwa" current={activeView} set={setActiveView} icon={<MessageSquare size={14} />} />
-            <NavTab label="IA" view="ai_config" current={activeView} set={setActiveView} icon={<Cpu size={14} />} />
+            <NavTab label="CONFIG IA" view="ai_config" current={activeView} set={setActiveView} icon={<Cpu size={14} />} />
+            <NavTab label="CHAT TEST" view="chat_test" current={activeView} set={setActiveView} icon={<Cpu size={14} />} />
           </nav>
           <button onClick={toggleTheme} className="p-2 rounded-md hover:bg-border/50 text-fgMuted hover:text-fg transition-colors" title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -63,6 +65,13 @@ function App() {
             {activeView === 'monitoring' && <MonitoringView />}
             {activeView === 'openwa' && <OpenWAView />}
             {activeView === 'ai_config' && <AIConfigView />}
+            {activeView === 'chat_test' && (
+              <div className="space-y-6 animate-in fade-in duration-500 max-w-3xl">
+                <h2 className="text-3xl font-light tracking-tight mb-2">Chat de Prueba Agentico</h2>
+                <p className="text-fgMuted mb-4">Simula una conversación con tu IA sin necesidad de WhatsApp para probar las herramientas (ejecución SQL).</p>
+                <ChatSimulator />
+              </div>
+            )}
           </div>
         </div>
       </main>
@@ -92,6 +101,7 @@ function SidebarContent({ activeView, setActiveView, configTab, setConfigTab }) 
     { view: 'monitoring', label: 'Monitoreo', icon: Activity },
     { view: 'openwa', label: 'Puente OpenWA', icon: MessageSquare },
     { view: 'ai_config', label: 'Configuración IA', icon: Cpu },
+    { view: 'chat_test', label: 'Chat de Prueba', icon: MessageSquare },
   ];
 
   return (
