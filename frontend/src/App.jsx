@@ -28,20 +28,13 @@ function App() {
         <div className="flex items-center gap-4">
           <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />
           <h1 className="font-medium tracking-wide">SmartFill</h1>
-          <span className="text-fgMuted text-sm font-mono">[CONSOLA DE ADMINISTRACIÓN]</span>
+          <span className="text-fgMuted text-sm font-mono flex items-center gap-2">
+            <span>/</span>
+            <span className="uppercase tracking-widest text-accent">{activeView.replace('_', ' ')}</span>
+          </span>
         </div>
-        <div className="flex items-center h-full">
-          <nav className="flex gap-1 h-full mr-6 overflow-x-auto">
-            <NavTab label="DASHBOARD" view="dashboard" current={activeView} set={setActiveView} icon={<BarChart3 size={14} />} />
-            <NavTab label="CONFIGURACIÓN" view="configuration" current={activeView} set={setActiveView} icon={<Database size={14} />} />
-            <NavTab label="HISTORIAL" view="history" current={activeView} set={setActiveView} icon={<Clock size={14} />} />
-            <NavTab label="REPORTES" view="reports" current={activeView} set={setActiveView} icon={<FileText size={14} />} />
-            <NavTab label="MANTENIMIENTO" view="maintenance" current={activeView} set={setActiveView} icon={<Wrench size={14} />} />
-            <NavTab label="MONITOREO" view="monitoring" current={activeView} set={setActiveView} icon={<Activity size={14} />} />
-            <NavTab label="OPENWA" view="openwa" current={activeView} set={setActiveView} icon={<MessageSquare size={14} />} />
-            <NavTab label="CONFIG IA" view="ai_config" current={activeView} set={setActiveView} icon={<Cpu size={14} />} />
-            <NavTab label="CHAT TEST" view="chat_test" current={activeView} set={setActiveView} icon={<Cpu size={14} />} />
-          </nav>
+        <div className="flex items-center gap-4 h-full">
+          {/* Aquí irá el botón de perfil o notificaciones en el futuro */}
           <button onClick={toggleTheme} className="p-2 rounded-md hover:bg-border/50 text-fgMuted hover:text-fg transition-colors" title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
@@ -79,17 +72,7 @@ function App() {
   );
 }
 
-function NavTab({ label, view, current, set, icon }) {
-  const active = current === view;
-  return (
-    <button onClick={() => set(view)}
-      className={`px-3 h-full text-xs font-mono tracking-wider border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-        active ? 'border-accent text-accent' : 'border-transparent text-fgMuted hover:text-fg hover:bg-border/30'
-      }`}>
-      {icon} {label}
-    </button>
-  );
-}
+
 
 function SidebarContent({ activeView, setActiveView, configTab, setConfigTab }) {
   const items = [
