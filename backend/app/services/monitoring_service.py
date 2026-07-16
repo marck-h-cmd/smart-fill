@@ -140,3 +140,81 @@ def run_full_check(conn, alert_umbral=30):
         "fragmentation": frag_result,
         "space": space_result
     }
+
+UNUSED_INDEX_QUERY = text("""
+SELECT
+    OBJECT_NAME(s.object_id) AS table_name,
+    i.name AS index_name,
+    s.user_updates AS writes,
+    s.user_seeks + s.user_scans + s.user_lookups AS reads,
+    'DROP INDEX ' + i.name + ' ON ' + OBJECT_NAME(s.object_id) AS drop_script
+FROM sys.dm_db_index_usage_stats s
+JOIN sys.indexes i ON s.object_id = i.object_id AND s.index_id = i.index_id
+WHERE OBJECTPROPERTY(s.object_id, 'IsUserTable') = 1
+  AND s.database_id = DB_ID()
+  AND i.type_desc = 'NONCLUSTERED'
+  AND i.is_primary_key = 0
+  AND i.is_unique_constraint = 0
+  AND s.user_seeks = 0
+  AND s.user_scans = 0
+  AND s.user_lookups = 0
+  AND s.user_updates > 0
+ORDER BY s.user_updates DESC
+""")
+
+MISSING_INDEX_QUERY = text("""
+SELECT
+    migs.group_handle,
+    migs.unique_compiles,
+    migs.user_seeks,
+    migs.user_scans,
+    migs.avg_total_user_cost,
+    migs.avg_user_impact,
+    mid.statement AS table_name,
+    mid.equality_columns,
+    mid.inequality_columns,
+    mid.included_columns,
+    'CREATE INDEX IX_Auto_Missing_' + CAST(migs.group_handle AS VARCHAR(10)) + 
+    ' ON ' + mid.statement + 
+    ' (' + ISNULL(mid.equality_columns, '') + 
+    CASE WHEN mid.equality_columns IS NOT NULL AND mid.inequality_columns IS NOT NULL THEN ', ' ELSE '' END +
+    ISNULL(mid.inequality_columns, '') + ')' +
+    ISNULL(' INCLUDE (' + mid.included_columns + ')', '') AS create_script
+FROM sys.dm_db_missing_index_group_stats migs
+JOIN sys.dm_db_missing_index_groups mig ON migs.group_handle = mig.index_group_handle
+JOIN sys.dm_db_missing_index_details mid ON mig.index_handle = mid.index_handle
+WHERE migs.avg_user_impact > 50
+ORDER BY migs.avg_total_user_cost * migs.avg_user_impact * (migs.user_seeks + migs.user_scans) DESC
+""")
+
+
+def check_unused_indexes(conn):
+    try:
+        engine = get_engine_from_conn(conn)
+        with engine.connect() as c:
+            result = c.execute(UNUSED_INDEX_QUERY)
+            rows = [dict(r._mapping) for r in result]
+        engine.dispose()
+        return {
+            "status": "success",
+            "count": len(rows),
+            "indexes": rows
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def check_missing_indexes(conn):
+    try:
+        engine = get_engine_from_conn(conn)
+        with engine.connect() as c:
+            result = c.execute(MISSING_INDEX_QUERY)
+            rows = [dict(r._mapping) for r in result]
+        engine.dispose()
+        return {
+            "status": "success",
+            "count": len(rows),
+            "indexes": rows
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

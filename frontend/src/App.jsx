@@ -9,6 +9,7 @@ import MaintenancePage from './pages/MaintenancePage';
 import OpenWAPage from './pages/OpenWAPage';
 import AIConfigPage from './pages/AIConfigPage';
 import MonitoringView from './pages/Monitoring';
+import IndexHealth from './pages/IndexHealth';
 import ChatSimulator from './components/chat/ChatSimulator';
 
 function App() {
@@ -41,6 +42,7 @@ function App() {
             {activeView === 'reports' && <ReportsPage />}
             {activeView === 'maintenance' && <MaintenancePage />}
             {activeView === 'monitoring' && <MonitoringView />}
+            {activeView === 'index_health' && <IndexHealth />}
             {activeView === 'openwa' && <OpenWAPage />}
             {activeView === 'ai_config' && <AIConfigPage />}
             {activeView === 'chat_test' && (
