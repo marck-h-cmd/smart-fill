@@ -33,6 +33,7 @@ def _format_estado(conn):
             f"   Acción: {t['suggested_action']}\n"
         )
     lines.append("💡 *Sugerencia:* Ejecuta /optimizar [nombre_tabla] para mejorar el rendimiento.")
+    lines.append("🌐 Para acceder al dashboard web usa /dashboard")
     return "\n".join(lines)
 
 def _format_recomendar(conn, table_name=None):
@@ -146,18 +147,126 @@ def _format_alertar(conn):
     lines.append("Responde con /estado para ver el detalle de fragmentación.")
     return "\n".join(lines)
 
+def _format_indices(conn):
+    from app.services.monitoring_service import check_unused_indexes, check_missing_indexes
+    unused = check_unused_indexes(conn)
+    missing = check_missing_indexes(conn)
+    
+    lines = ["📊 *SALUD DE ÍNDICES*", ""]
+    
+    if unused.get('status') == 'success':
+        lines.append(f"⚠️ *Índices Inútiles:* {unused.get('count', 0)}")
+        for idx in unused.get('indexes', [])[:3]:
+            lines.append(f"  • {idx['index_name']} (Tabla: {idx['table_name']}) - {idx['writes']} escrituras")
+        if unused.get('count', 0) > 3:
+            lines.append("  ... y otros más. (Ver dashboard para detalles)")
+    else:
+        lines.append("❌ Error obteniendo índices inútiles.")
+        
+    lines.append("")
+    
+    if missing.get('status') == 'success':
+        lines.append(f"💡 *Índices Faltantes Sugeridos:* {missing.get('count', 0)}")
+        for idx in missing.get('indexes', [])[:3]:
+            lines.append(f"  • Tabla: {idx['table_name']}")
+            lines.append(f"    Impacto: {int(idx['avg_user_impact'])}% | Búsquedas: {idx['user_seeks'] + idx['user_scans']}")
+            lines.append(f"    👉 Para crearlo: /crear_indice {idx['group_handle']}")
+    else:
+        lines.append("❌ Error obteniendo índices faltantes.")
+        
+    lines.append("")
+    lines.append("🌐 Para más detalles en la consola web usa /dashboard")
+    return "\n".join(lines)
+
+def _format_espacio(conn):
+    from app.services.monitoring_service import check_database_space
+    space = check_database_space(conn)
+    if space.get('status') != 'success':
+        return f"❌ Error obteniendo información de espacio: {space.get('message')}"
+    
+    lines = [
+        "💾 *REPORTE DE ESPACIO*",
+        f"Base de datos: {conn.database}",
+        "",
+        f"   📦 Tamaño Total: {space['total_size_mb']} MB",
+        f"   📈 Espacio Usado: {space['total_used_mb']} MB ({space['used_percent']}%)",
+        f"   🆓 Espacio Libre: {space['free_mb']} MB",
+        f"   ⚙️ Autogrow activado: {'Sí' if space['has_autogrow'] else 'No'}",
+        f"   🛑 Tamaño Máximo: {space['max_size_mb']} MB"
+    ]
+    return "\n".join(lines)
+
+def _format_conexiones(conn):
+    from app.services.monitoring_service import check_connections
+    conn_data = check_connections(conn)
+    if conn_data.get('status') != 'success':
+        return f"❌ Error obteniendo conexiones: {conn_data.get('message')}"
+    
+    lines = [
+        "🔌 *CONEXIONES ACTIVAS*",
+        f"Total de conexiones de usuario: {conn_data['total']}",
+        ""
+    ]
+    for row in conn_data.get('connections', []):
+        status_emoji = "🟢" if row['status'] == 'running' else "💤" if row['status'] == 'sleeping' else "🟡"
+        lines.append(f"   {status_emoji} {row['status'].capitalize()}: {row['count']}")
+        
+    return "\n".join(lines)
+
+def _format_crear_indice(conn, group_handle):
+    from app.services.monitoring_service import create_missing_index
+    res = create_missing_index(conn, group_handle)
+    if res.get('status') == 'success':
+        return f"✅ *Índice creado exitosamente*\nSe ejecutó el script recomendado para el grupo {group_handle}."
+    else:
+        return f"❌ *Error creando índice*\n{res.get('message')}"
+
+def _format_optimizar_all(conn):
+    from app.services.optimization_service import execute_all_optimizations
+    res = execute_all_optimizations(conn)
+    if res.get('success'):
+        lines = [
+            f"✅ *Optimización Masiva Completada*",
+            f"Tablas optimizadas: {res.get('count', 0)}",
+            ""
+        ]
+        for detail in res.get('details', [])[:5]:
+            lines.append(f"  • {detail.get('message')}")
+        if res.get('count', 0) > 5:
+            lines.append(f"  ... y {res.get('count', 0) - 5} más.")
+        return "\n".join(lines)
+    else:
+        return f"❌ Error en optimización masiva: {res.get('message', 'Desconocido')}"
+
+def _format_dashboard():
+    from app.models.base import Configuracion
+    frontend_url_conf = Configuracion.query.filter_by(clave='frontend_url').first()
+    frontend_url = frontend_url_conf.valor if frontend_url_conf else 'http://localhost:5173'
+    
+    lines = [
+        "🌐 *DASHBOARD WEB*",
+        "",
+        f"Accede a la consola de administración aquí:",
+        f"👉 {frontend_url}"
+    ]
+    return "\n".join(lines)
+
 def _format_comandos():
     lines = [
         "📋 *COMANDOS DISPONIBLES*",
         "",
         "   /estado        - Muestra el estado de fragmentación de índices",
         "   /recomendar    - Sugiere FillFactor óptimo para tablas fragmentadas",
-        "   /recomendar <tabla> - Recomendación específica para una tabla",
-        "   /optimizar <tabla> - Ejecuta REBUILD/REORGANIZE sobre una tabla",
+        "   /optimizar     - Ejecuta REBUILD/REORGANIZE masivo en tablas críticas",
+        "   /optimizar <t> - Ejecuta REBUILD/REORGANIZE sobre una tabla",
         "   /historial     - Últimas métricas de fragmentación registradas",
-        "   /historial <tabla> - Historial de una tabla específica",
         "   /alertas       - Muestra y configura umbrales y horarios",
         "   /alertar       - Ejecuta chequeo completo de alertas manual",
+        "   /indices       - Resumen de índices inútiles y faltantes",
+        "   /crear_indice <id> - Crea un índice faltante sugerido",
+        "   /espacio       - Reporte de espacio de la base de datos",
+        "   /conexiones    - Muestra las conexiones activas por estado",
+        "   /dashboard     - Obtiene la URL de acceso a la consola web",
         "",
         "💡 *Tip:* También puedes mencionarme con @" + "BotSmartfill seguido de tu consulta.",
         "   Ej: @BotSmartfill ¿qué tabla tiene más fragmentación?"
@@ -204,16 +313,56 @@ def _handle_command(text, active_bot_session, chat_id):
 
     elif command == '/optimizar':
         if not args:
-            _send_reply(active_bot_session, chat_id,
-                "⚠️ Debes especificar un nombre de tabla. Ejemplo: /optimizar Ventas")
-            return
-        table_name = args[0]
+            try:
+                response = _format_optimizar_all(conn)
+            except Exception as e:
+                response = f"❌ Error al ejecutar optimización masiva: {str(e)}"
+            _send_reply(active_bot_session, chat_id, response)
+            context_service.add_event(chat_id, "optimization", f"/optimizar masivo: {response[:200]}")
+        else:
+            table_name = args[0]
+            try:
+                response = _format_optimizar(conn, table_name)
+            except Exception as e:
+                response = f"❌ Error al ejecutar optimización: {str(e)}"
+            _send_reply(active_bot_session, chat_id, response)
+            context_service.add_event(chat_id, "optimization", f"/optimizar {table_name}: {response[:200]}")
+
+    elif command == '/indices_salud' or command == '/indices':
         try:
-            response = _format_optimizar(conn, table_name)
+            response = _format_indices(conn)
         except Exception as e:
-            response = f"❌ Error al ejecutar optimización: {str(e)}"
+            response = f"❌ Error al consultar índices: {str(e)}"
         _send_reply(active_bot_session, chat_id, response)
-        context_service.add_event(chat_id, "optimization", f"/optimizar {table_name}: {response[:200]}")
+        context_service.add_event(chat_id, "command_result", "/indices consultado")
+
+    elif command == '/crear_indice':
+        if not args:
+            _send_reply(active_bot_session, chat_id, "⚠️ Debes especificar el ID (group_handle) del índice a crear. Ejemplo: /crear_indice 12345")
+            return
+        group_handle = args[0]
+        try:
+            response = _format_crear_indice(conn, group_handle)
+        except Exception as e:
+            response = f"❌ Error al crear índice: {str(e)}"
+        _send_reply(active_bot_session, chat_id, response)
+        context_service.add_event(chat_id, "command_result", f"/crear_indice {group_handle}")
+
+    elif command == '/espacio':
+        try:
+            response = _format_espacio(conn)
+        except Exception as e:
+            response = f"❌ Error al consultar espacio: {str(e)}"
+        _send_reply(active_bot_session, chat_id, response)
+        context_service.add_event(chat_id, "command_result", "/espacio consultado")
+
+    elif command == '/conexiones':
+        try:
+            response = _format_conexiones(conn)
+        except Exception as e:
+            response = f"❌ Error al consultar conexiones: {str(e)}"
+        _send_reply(active_bot_session, chat_id, response)
+        context_service.add_event(chat_id, "command_result", "/conexiones consultado")
 
     elif command == '/historial':
         table_name = args[0] if args else None
@@ -237,10 +386,16 @@ def _handle_command(text, active_bot_session, chat_id):
         _send_reply(active_bot_session, chat_id, response)
         context_service.add_event(chat_id, "command_result", "/alertar ejecutado")
 
+    elif command == '/dashboard':
+        response = _format_dashboard()
+        _send_reply(active_bot_session, chat_id, response)
+        context_service.add_event(chat_id, "command_result", "/dashboard consultado")
+
     else:
         _send_reply(active_bot_session, chat_id,
             f"⚠️ Comando no reconocido: {command}\n"
-            f"Comandos disponibles: /estado, /recomendar, /optimizar, /historial, /alertas, /alertar")
+            f"Comandos disponibles: /estado, /recomendar, /optimizar, /historial, /alertas, /alertar, /indices, /crear_indice, /espacio, /conexiones, /dashboard")
+
 
 @bp.route('/send', methods=['POST'])
 def send_message():

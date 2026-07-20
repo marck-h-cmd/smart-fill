@@ -218,3 +218,54 @@ def check_missing_indexes(conn):
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+def create_missing_index(conn, group_handle):
+    try:
+        engine = get_engine_from_conn(conn)
+        script = None
+        # Buscar el script de creacion para ese group_handle
+        with engine.connect() as c:
+            result = c.execute(MISSING_INDEX_QUERY)
+            for r in result:
+                if str(r._mapping["group_handle"]) == str(group_handle):
+                    script = r._mapping["create_script"]
+                    break
+            
+            if not script:
+                return {"status": "error", "message": f"No se encontró recomendación para el ID {group_handle}"}
+            
+            # Ejecutar script
+            trans = c.begin()
+            try:
+                c.execute(text(script))
+                trans.commit()
+                return {"status": "success", "message": f"Índice creado exitosamente", "script": script}
+            except Exception as e:
+                trans.rollback()
+                return {"status": "error", "message": f"Error ejecutando script: {str(e)}", "script": script}
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        engine.dispose()
+
+def check_connections(conn):
+    try:
+        engine = get_engine_from_conn(conn)
+        query = text("""
+            SELECT status, COUNT(*) as count 
+            FROM sys.dm_exec_sessions 
+            WHERE database_id = DB_ID() AND is_user_process = 1
+            GROUP BY status
+        """)
+        with engine.connect() as c:
+            result = c.execute(query)
+            rows = [{"status": r._mapping["status"], "count": r._mapping["count"]} for r in result]
+        engine.dispose()
+        return {
+            "status": "success",
+            "connections": rows,
+            "total": sum(r["count"] for r in rows)
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
