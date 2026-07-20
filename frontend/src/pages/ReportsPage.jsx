@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { FileText } from 'lucide-react';
 import KPICard from '../components/dashboard/KPICard';
+import PDFReportButton from '../components/dashboard/PDFReportButton';
 
 function ReportsPage() {
   const [report, setReport] = useState(null);
@@ -44,11 +45,24 @@ function ReportsPage() {
       {loading && <p className="text-fgMuted font-mono text-sm">Generando reporte...</p>}
 
       {report && (
-        <div className="panel p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-mono">Resumen Ejecutivo</h3>
-            <span className="text-xs font-mono text-fgMuted">Generado: {new Date(report.generated_at).toLocaleString()}</span>
-          </div>
+        <div className="space-y-6">
+          <div className="panel p-8 space-y-8 bg-surface text-fg">
+            <div className="border-b border-border pb-4 mb-6">
+              <div className="flex items-center gap-3 mb-2">
+                <FileText size={28} className="text-accent" />
+                <h2 className="text-2xl font-light tracking-tight">Reporte Ejecutivo SmartFill</h2>
+              </div>
+              <p className="text-sm font-mono text-fgMuted">
+                Análisis de estado y fragmentación de base de datos
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-mono">Resumen de Métricas</h3>
+              <span className="text-xs font-mono text-fgMuted bg-panel px-3 py-1 rounded">
+                Generado: {new Date(report.generated_at).toLocaleString()}
+              </span>
+            </div>
 
           <div className="grid grid-cols-4 gap-px bg-border border border-border">
             <KPICard title="TABLAS ANALIZADAS" value={report.summary.total_tables_analyzed} sub="En total" />
@@ -70,11 +84,10 @@ function ReportsPage() {
               </div>
             </div>
           )}
+          </div>
 
-          <div className="flex gap-3 pt-4">
-            <button onClick={() => window.print()} className="btn-accent py-2 px-4 text-sm font-mono">
-              Imprimir Reporte
-            </button>
+          <div className="flex gap-3 pt-2">
+            <PDFReportButton report={report} />
           </div>
         </div>
       )}
