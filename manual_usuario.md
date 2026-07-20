@@ -254,6 +254,17 @@ Este módulo permite parametrizar el cerebro del asistente y probarlo en un ento
 
 ---
 
+### 4.8. Configuración del Motor de Automatización (Scheduler)
+Este módulo gestiona los intervalos de ejecución en segundo plano para las tareas críticas del sistema sin intervención manual.
+
+- **Procedimiento para Configurar Intervalos Automáticos**:
+  1. Navegue a la sección correspondiente de **Automatización** (o a través de la API/UI si está integrada).
+  2. El sistema utiliza intervalos en segundos para tres tareas principales:
+     - **Intervalo de Alertas (`alert_interval`)**: Frecuencia con la que el sistema busca problemas urgentes de espacio y fragmentación para enviar notificaciones (por defecto 3600s / 1 hora).
+     - **Intervalo de Análisis (`analysis_interval`)**: Frecuencia de recolección de métricas históricas de índices en la base de datos (por defecto 86400s / 1 día).
+     - **Intervalo de Mantenimiento (`maintenance_interval`)**: Frecuencia de reindexación automática de tablas que superan el umbral crítico (por defecto 604800s / 1 semana).
+  3. Al actualizar cualquiera de estos valores, el planificador en segundo plano (`APScheduler`) reprogramará instantáneamente las tareas sin necesidad de reiniciar el servidor.
+
 ---
 
 ## 5. El Chatbot de WhatsApp (Guía de Comandos)
@@ -283,6 +294,8 @@ El bot procesa comandos tradicionales que inician con `/` para ofrecer respuesta
   - **Descripción**: Muestra los umbrales de fragmentación crítica y alerta configurados y el horario programado de mantenimiento diario.
 - **`/alertar`**:
   - **Descripción**: Dispara una auditoría manual completa sobre la base de datos y notifica inmediatamente si se superan los límites saludables de fragmentación o espacio en disco.
+- **`/dashboard`**:
+  - **Descripción**: Obtiene la URL de acceso directo a la consola de administración web para visualizar métricas, reportes e historial en detalle.
 
 ### 5.2. Consultas en Lenguaje Natural
 Además de comandos rápidos, al mencionar al bot con su alias (ej. `@BotSmartfill ¿hay problemas de almacenamiento?`), la IA procesará la pregunta, recopilará el contexto de las DMV del servidor y responderá detalladamente en español:

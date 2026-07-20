@@ -11,12 +11,16 @@ def create_app():
 
     db.init_app(app)
 
-    from .api.routes import dashboard, whatsapp, config_routes, databases, monitoring
+    from .api.routes import dashboard, whatsapp, config_routes, databases, monitoring, automation, maintenance, history, reports
     app.register_blueprint(dashboard.bp)
     app.register_blueprint(whatsapp.bp)
     app.register_blueprint(config_routes.bp)
     app.register_blueprint(databases.bp)
     app.register_blueprint(monitoring.bp)
+    app.register_blueprint(automation.bp)
+    app.register_blueprint(maintenance.bp)
+    app.register_blueprint(history.bp)
+    app.register_blueprint(reports.bp)
 
     with app.app_context():
         start_scheduler()

@@ -71,7 +71,7 @@ export default function DatabaseConfig() {
       setStatusMsg(editingId ? 'Conexión reconectada y activada exitosamente' : 'Conectado exitosamente');
       loadConnections();
     } catch (err) {
-      setConnectionError(err.response?.data?.error || err.message);
+      setConnectionError(err.response?.data?.error || err.response?.data?.message || err.message || 'Error de conexión');
     }
     setConnecting(false);
   };
@@ -145,7 +145,7 @@ export default function DatabaseConfig() {
         setForm({ ...form, database: res.data.data[0] });
       }
     } catch (err) {
-      setExploreError(err.response?.data?.message || 'Error al obtener bases de datos');
+      setExploreError(err.response?.data?.message || err.response?.data?.error || err.message || 'Error al obtener bases de datos');
     }
     setLoadingDbs(false);
   };
