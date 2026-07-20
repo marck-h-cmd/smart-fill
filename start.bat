@@ -5,10 +5,10 @@ echo Iniciando Sistema SmartFill
 echo ==========================================
 
 echo [1/2] Iniciando Backend (Flask)...
-start "SmartFill Backend" cmd /c "cd backend && if exist venv\Scripts\activate.bat (call venv\Scripts\activate.bat) else (echo Advertencia: No se encontro el entorno virtual venv) && python run.py"
+start "SmartFill Backend" cmd /k "cd backend && venv\Scripts\python.exe run.py"
 
 echo [2/2] Iniciando Frontend (React/Vite)...
-start "SmartFill Frontend" cmd /c "cd frontend && npm run dev"
+start "SmartFill Frontend" cmd /k "cd frontend && npm run dev"
 
 echo.
 echo ==========================================
