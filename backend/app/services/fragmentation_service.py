@@ -87,7 +87,7 @@ def get_top_fragmented(conn, limit=5):
     engine = get_engine_from_conn(conn)
     try:
         with engine.connect() as c:
-            result = c.execute(FRAGMENTATION_QUERY)
+            result = c.execute(FRAGMENTATION_ALL_QUERY)
             rows = []
             for row in result:
                 rows.append({

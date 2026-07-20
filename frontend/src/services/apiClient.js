@@ -51,4 +51,9 @@ export const automation = {
   config: (data) => api.post('/automation/config', data).then(r => r.data),
 };
 
+export const monitoring = {
+  unusedIndexes: (dbId) => api.get(`/monitoring/${dbId}/indexes/unused`).then(r => r.data),
+  missingIndexes: (dbId) => api.get(`/monitoring/${dbId}/indexes/missing`).then(r => r.data),
+};
+
 export default api;
