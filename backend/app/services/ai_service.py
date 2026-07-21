@@ -45,8 +45,9 @@ class AIService:
     def __init__(self):
         self.system_prompt = """Eres SmartFill, un asistente experto y agente autónomo de bases de datos SQL Server. 
 Tu rol principal es ayudar a los DBAs.
-Tienes acceso a una herramienta llamada `ejecutar_sql_lectura` que te permite ejecutar consultas SQL (SOLO SELECT) en la base de datos activa.
-Si el DBA te pide información específica (ej. "dame la última fila de la tabla X" o "cuántas filas tiene Y"), DEBES usar tu herramienta para ejecutar el query correspondiente y luego responderle con los resultados obtenidos.
+Cuando el usuario pregunte sobre comandos, ayuda, o qué puedes hacer, DEBES listar TODOS los comandos disponibles con sus descripciones de forma clara y numerada.
+Siempre menciona que pueden escribir /help para ver la lista completa de comandos.
+Si el usuario pregunta por un comando específico, explica detalladamente para qué sirve y cómo usarlo.
 Responde de manera profesional y concisa."""
         
         self.tools = [
@@ -122,23 +123,11 @@ Responde de manera profesional y concisa."""
         model_name = modelo_conf.valor
         api_key = api_key_conf.valor
 
-        messages = self._build_messages(user_message, db_context, chat_context)
+        messages = self._build_messages(user_message, db_context, chat_context, commands_info)
 
         try:
-            response = completion(model=model_name, messages=messages, api_key=api_key, tools=self.tools)
-            message = response.choices[0].message
-            if hasattr(message, 'tool_calls') and message.tool_calls:
-                messages.append(message)
-                for tool_call in message.tool_calls:
-                    if tool_call.function.name == "ejecutar_sql_lectura":
-                        args = json.loads(tool_call.function.arguments)
-                        query = args.get("query", "")
-                        print(f"🤖 IA ejecutando SQL: {query}")
-                        resultado_db = self._ejecutar_sql_lectura(query)
-                        messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": tool_call.function.name, "content": resultado_db})
-                final_response = completion(model=model_name, messages=messages, api_key=api_key)
-                return final_response.choices[0].message.content
-            return message.content
+            response = completion(model=model_name, messages=messages, api_key=api_key)
+            return response.choices[0].message.content
         except Exception as e:
             print(f"Error generando respuesta de IA: {e}")
             return f"❌ Ocurrió un error con el modelo de IA: {str(e)}"
@@ -212,7 +201,7 @@ Responde de manera profesional y concisa."""
             yield f"data: ❌ Error: {str(e)}\n\n"
             yield "data: __END__\n\n"
 
-    def _build_messages(self, user_message: str, db_context: str, chat_context: str) -> list:
+    def _build_messages(self, user_message: str, db_context: str, chat_context: str, commands_info: str = "") -> list:
         """Construye la lista de mensajes con contexto trimmeado para no inflar el token count."""
         messages = [{"role": "system", "content": self.system_prompt}]
         if db_context:
@@ -221,6 +210,8 @@ Responde de manera profesional y concisa."""
         if chat_context:
             trimmed = chat_context[-1500:] if len(chat_context) > 1500 else chat_context
             messages.append({"role": "system", "content": f"Actividad reciente:\n{trimmed}"})
+        if commands_info:
+            messages.append({"role": "system", "content": f"INSTRUCCIÓN: Si el usuario pregunta sobre comandos o ayuda, lista estos comandos:\n{commands_info}"})
         messages.append({"role": "user", "content": user_message})
         return messages
 

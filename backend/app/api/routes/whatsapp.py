@@ -255,31 +255,70 @@ def _format_comandos():
     lines = [
         "📋 *COMANDOS DISPONIBLES*",
         "",
-        "   /estado        - Muestra el estado de fragmentación de índices",
-        "   /recomendar    - Sugiere FillFactor óptimo para tablas fragmentadas",
-        "   /optimizar     - Ejecuta REBUILD/REORGANIZE masivo en tablas críticas",
-        "   /optimizar <t> - Ejecuta REBUILD/REORGANIZE sobre una tabla",
-        "   /historial     - Últimas métricas de fragmentación registradas",
-        "   /alertas       - Muestra y configura umbrales y horarios",
-        "   /alertar       - Ejecuta chequeo completo de alertas manual",
-        "   /indices       - Resumen de índices inútiles y faltantes",
-        "   /crear_indice <id> - Crea un índice faltante sugerido",
-        "   /espacio       - Reporte de espacio de la base de datos",
-        "   /conexiones    - Muestra las conexiones activas por estado",
-        "   /dashboard     - Obtiene la URL de acceso a la consola web",
+        "0. /help (o /ayuda)",
+        "   → Muestra esta lista completa de comandos con explicaciones",
         "",
-        "💡 *Tip:* También puedes mencionarme con @" + "BotSmartfill seguido de tu consulta.",
-        "   Ej: @BotSmartfill ¿qué tabla tiene más fragmentación?"
+        "1. /estado",
+        "   → Muestra el estado actual de fragmentación de todos los índices monitoreados",
+        "",
+        "2. /recomendar",
+        "   → Analiza tablas fragmentadas y sugiere el FillFactor óptimo para mejorar rendimiento",
+        "",
+        "3. /recomendar <nombre_tabla>",
+        "   → Analiza una tabla específica y recomienda FillFactor ideal",
+        "",
+        "4. /optimizar",
+        "   → Ejecuta REBUILD o REORGANIZE automáticamente en todas las tablas críticas (>=30% fragmentación)",
+        "",
+        "5. /optimizar <nombre_tabla>",
+        "   → Ejecuta REBUILD/REORGANIZE sobre una tabla específica",
+        "",
+        "6. /historial",
+        "   → Muestra las últimas métricas de fragmentación registradas en el sistema",
+        "",
+        "7. /alertas",
+        "   → Muestra umbrales configurados y permite ajustar alertas automáticas",
+        "",
+        "8. /alertar",
+        "   → Ejecuta un chequeo manual completo de alertas y envía notificaciones si hay problemas",
+        "",
+        "9. /indices",
+        "   → Resumen de índices inútiles (sin uso) y faltantes sugeridos",
+        "",
+        "10. /crear_indice <id>",
+        "   → Crea un índice faltante sugerido por el análisis",
+        "",
+        "11. /espacio",
+        "   → Reporte detallado de uso de espacio en disco de la base de datos",
+        "",
+        "12. /conexiones",
+        "   → Muestra las conexiones activas a la base de datos por estado",
+        "",
+        "13. /dashboard",
+        "   → Obtiene la URL de acceso a la consola web SmartFill",
+        "",
+        "💡 *Para consultas libres:* Mencióname con @BotSmartfill seguido de tu pregunta.",
+        "   Ejemplo: @BotSmartfill ¿qué tabla tiene más fragmentación?"
     ]
     return "\n".join(lines)
 
 
 def _send_reply(session_id, chat_id, text):
     try:
+        # WhatsApp tiene límite de ~4096 caracteres por mensaje
+        MAX_LEN = 4000
+        if len(text) > MAX_LEN:
+            text = text[:MAX_LEN] + "\n\n... (mensaje truncado por límite de WhatsApp)"
         wsp_service.send_message(session_id, chat_id, text)
     except Exception as e:
         print(f"❌ Error enviando respuesta por WhatsApp: {e}")
+        # Intentar enviar mensaje de error corto al usuario
+        try:
+            wsp_service.send_message(session_id, chat_id, "⚠️ Ocurrió un error enviando la respuesta completa. Intenta con una consulta más corta.")
+        except:
+            pass
 
+#======================= COMANDOS =======================
 def _handle_command(text, active_bot_session, chat_id):
     text = text.strip()
     parts = text.split()
@@ -294,7 +333,12 @@ def _handle_command(text, active_bot_session, chat_id):
             "⚠️ No hay una base de datos activa. Configura una desde el dashboard web o usa /alertas para ver opciones.")
         return
 
-    if command == '/estado':
+    if command == '/help' or command == '/ayuda':
+        response = _format_comandos()
+        _send_reply(active_bot_session, chat_id, response)
+        context_service.add_event(chat_id, "command_result", "/help consultado")
+
+    elif command == '/estado':
         try:
             response = _format_estado(conn)
         except Exception as e:
@@ -394,7 +438,7 @@ def _handle_command(text, active_bot_session, chat_id):
     else:
         _send_reply(active_bot_session, chat_id,
             f"⚠️ Comando no reconocido: {command}\n"
-            f"Comandos disponibles: /estado, /recomendar, /optimizar, /historial, /alertas, /alertar, /indices, /crear_indice, /espacio, /conexiones, /dashboard")
+            f"Escribe /help para ver la lista completa de comandos con sus descripciones.")
 
 
 @bp.route('/send', methods=['POST'])
@@ -529,7 +573,7 @@ def webhook():
                 print(f"[WEBHOOK DEBUG] Comando detectado: {texto}")
                 _handle_command(texto, active_bot_session, chat_id)
 
-            elif bot_alias in texto:
+            elif bot_alias.lower() in texto.lower():
                 print(f"[WEBHOOK DEBUG] Alias '{bot_alias}' detectado, llamando al LLM...")
                 conn = DatabaseConnection.query.filter_by(is_active=True).first()
                 db_str = build_db_context(conn) if conn else ""
