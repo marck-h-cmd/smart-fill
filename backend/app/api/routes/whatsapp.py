@@ -469,10 +469,10 @@ def _handle_command(text, active_bot_session, chat_id):
         context_service.add_event(chat_id, "command_result", f"/historial {table_name or ''}")
 
     elif command == '/alertas':
-        if args and args[0] == 'set' and len(args) >= 3:
+        if args and args[0].lower() == 'set' and len(args) >= 3:
             from app.models.base import Configuracion
             from app.extensions import db
-            if args[1] == 'umbral':
+            if args[1].lower() == 'umbral':
                 try:
                     val = float(args[2])
                     conf = Configuracion.query.filter_by(clave='alert_umbral').first()
@@ -485,7 +485,7 @@ def _handle_command(text, active_bot_session, chat_id):
                     response = f"✅ Umbral de alerta actualizado a {val}%"
                 except:
                     response = "❌ Valor de umbral inválido. Usa un número, ej: /alertas set umbral 25"
-            elif args[1] == 'horario':
+            elif args[1].lower() == 'horario':
                 val = args[2]
                 conf = Configuracion.query.filter_by(clave='horario_mantenimiento').first()
                 if not conf:

@@ -39,7 +39,9 @@ SELECT
         WHEN ips.avg_fragmentation_in_percent >= 10 THEN 'REORGANIZE'
         ELSE 'OK'
     END AS suggested_action,
-    i.fill_factor AS current_fillfactor
+    i.fill_factor AS current_fillfactor,
+    i.name AS index_name,
+    ips.index_type_desc AS index_type
 FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED') ips
 JOIN sys.indexes i ON ips.object_id = i.object_id AND ips.index_id = i.index_id
 JOIN (
@@ -114,6 +116,8 @@ def get_all_fragmented(conn):
                     'total_rows': row.total_rows,
                     'suggested_action': row.suggested_action,
                     'current_fillfactor': row.current_fillfactor,
+                    'index_name': row.index_name,
+                    'index_type': row.index_type,
                 })
             return rows
     finally:
