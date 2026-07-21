@@ -20,26 +20,6 @@ def get_maintenance_config():
 @bp.route('', methods=['POST'])
 def save_maintenance_config():
     data = request.json or {}
-    
-    # Manejar acción manual de prueba de optimización
-    if data.get('action') == 'optimize':
-        from app.models.database_connection import DatabaseConnection
-        from app.services.optimization_service import execute_optimization, execute_all_optimizations
-        
-        conn = DatabaseConnection.query.filter_by(is_active=True).first()
-        if not conn:
-            return jsonify({"status": "error", "message": "No hay una base de datos activa configurada"}), 400
-            
-        table_name = data.get('table_name')
-        try:
-            if table_name:
-                res = execute_optimization(conn, table_name)
-            else:
-                res = execute_all_optimizations(conn)
-            return jsonify({"status": "success", "data": res, "message": res.get('message', 'Optimización completada.')})
-        except Exception as e:
-            return jsonify({"status": "error", "message": str(e)}), 500
-
     try:
         keys = ['maintenance_enabled', 'maintenance_horario', 'maintenance_umbral']
         for key in keys:
