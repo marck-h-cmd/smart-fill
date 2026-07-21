@@ -33,7 +33,7 @@ def check_and_alert():
         return jsonify({"error": "No hay una base de datos activa configurada"}), 400
 
     alert_umbral_conf = Configuracion.query.filter_by(clave='alert_umbral').first()
-    alert_umbral = int(alert_umbral_conf.valor) if alert_umbral_conf else 30
+    alert_umbral = float(alert_umbral_conf.valor) if alert_umbral_conf else 30.0
 
     result = run_full_check(conn, alert_umbral)
     if result.get('status') != 'success':

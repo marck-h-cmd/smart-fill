@@ -17,7 +17,7 @@ def run_alert_check():
             return
 
         alert_umbral_conf = Configuracion.query.filter_by(clave='alert_umbral').first()
-        alert_umbral = int(alert_umbral_conf.valor) if alert_umbral_conf else 30
+        alert_umbral = float(alert_umbral_conf.valor) if alert_umbral_conf else 30.0
 
         result = run_full_check(conn, alert_umbral)
         if result.get('status') != 'success':
