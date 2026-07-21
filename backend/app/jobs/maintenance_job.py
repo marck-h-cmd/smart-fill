@@ -1,12 +1,13 @@
 from sqlalchemy import text
 from app.models.database_connection import DatabaseConnection
 from app.models.base import Configuracion
-from app.extensions import db
 from app.services.database_service import get_engine_from_conn
 
 
 def run_maintenance():
-    with db.app.app_context():
+    from app import create_app
+    app = create_app()
+    with app.app_context():
         conn = DatabaseConnection.query.filter_by(is_active=True).first()
         if not conn:
             print("[maintenance_job] No hay base de datos activa")

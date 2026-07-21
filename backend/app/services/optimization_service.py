@@ -1,5 +1,7 @@
 from sqlalchemy import text
 from app.services.database_service import get_engine_from_conn
+from app.extensions import db
+from datetime import datetime
 
 def generate_script(table_name, action, fill_factor=None):
     if action == 'REBUILD':
@@ -42,6 +44,27 @@ def execute_optimization(conn, table_name):
             try:
                 c.execute(text(plan['script']))
                 trans.commit()
+                
+                # Update history metrics immediately after successful optimization
+                try:
+                    from app.models.base import TablaMetricas
+                    metric = TablaMetricas.query.filter_by(nombre_tabla=table_name).first()
+                    if metric:
+                        metric.fragmentacion_porcentaje = 0
+                        metric.ultima_actualizacion = datetime.utcnow()
+                    else:
+                        metric = TablaMetricas(
+                            nombre_tabla=table_name,
+                            fragmentacion_porcentaje=0,
+                            fillfactor_actual=plan.get('suggested_fillfactor') or 100,
+                            total_filas=0,
+                            ultima_actualizacion=datetime.utcnow()
+                        )
+                        db.session.add(metric)
+                    db.session.commit()
+                except Exception as ex:
+                    print(f"Advertencia: No se pudo actualizar el historial para {table_name}: {ex}")
+
                 return {
                     'success': True,
                     'action': plan['action'],
@@ -61,3 +84,27 @@ def execute_optimization(conn, table_name):
                 }
     finally:
         engine.dispose()
+
+def execute_all_optimizations(conn):
+    from app.services.recommendation_service import recommend_top_critical
+    # Obtener todas las tablas críticas y moderadas (ej. limit=50 para no hacer demasiadas a la vez)
+    recs = recommend_top_critical(conn, limit=50)
+    if not recs:
+        return {'success': True, 'message': 'No hay tablas que requieran optimización.', 'count': 0, 'details': []}
+    
+    results = []
+    success_count = 0
+    
+    for r in recs:
+        if r['action'] in ['REBUILD', 'REORGANIZE']:
+            res = execute_optimization(conn, r['table_name'])
+            results.append(res)
+            if res.get('success'):
+                success_count += 1
+                
+    return {
+        'success': True,
+        'message': f'Se optimizaron {success_count} de {len([r for r in recs if r["action"] in ["REBUILD", "REORGANIZE"]])} tablas.',
+        'count': success_count,
+        'details': results
+    }

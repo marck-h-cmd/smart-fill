@@ -140,3 +140,182 @@ def run_full_check(conn, alert_umbral=30):
         "fragmentation": frag_result,
         "space": space_result
     }
+
+
+UNUSED_INDEX_QUERY = text("""
+SELECT
+    OBJECT_NAME(s.object_id) AS table_name,
+    i.name AS index_name,
+    s.user_updates AS writes,
+    s.user_seeks + s.user_scans + s.user_lookups AS reads,
+    'DROP INDEX ' + i.name + ' ON ' + OBJECT_NAME(s.object_id) AS drop_script
+FROM sys.dm_db_index_usage_stats s
+JOIN sys.indexes i ON s.object_id = i.object_id AND s.index_id = i.index_id
+WHERE OBJECTPROPERTY(s.object_id, 'IsUserTable') = 1
+  AND s.database_id = DB_ID()
+  AND i.type_desc = 'NONCLUSTERED'
+  AND i.is_primary_key = 0
+  AND i.is_unique_constraint = 0
+  AND s.user_seeks = 0
+  AND s.user_scans = 0
+  AND s.user_lookups = 0
+  AND s.user_updates > 0
+ORDER BY s.user_updates DESC
+""")
+
+MISSING_INDEX_QUERY = text("""
+SELECT
+    migs.group_handle,
+    migs.unique_compiles,
+    migs.user_seeks,
+    migs.user_scans,
+    migs.avg_total_user_cost,
+    migs.avg_user_impact,
+    mid.statement AS table_name,
+    mid.equality_columns,
+    mid.inequality_columns,
+    mid.included_columns,
+    'CREATE INDEX IX_Auto_Missing_' + CAST(migs.group_handle AS VARCHAR(10)) + 
+    ' ON ' + mid.statement + 
+    ' (' + ISNULL(mid.equality_columns, '') + 
+    CASE WHEN mid.equality_columns IS NOT NULL AND mid.inequality_columns IS NOT NULL THEN ', ' ELSE '' END +
+    ISNULL(mid.inequality_columns, '') + ')' +
+    ISNULL(' INCLUDE (' + mid.included_columns + ')', '') AS create_script
+FROM sys.dm_db_missing_index_group_stats migs
+JOIN sys.dm_db_missing_index_groups mig ON migs.group_handle = mig.index_group_handle
+JOIN sys.dm_db_missing_index_details mid ON mig.index_handle = mid.index_handle
+WHERE migs.avg_user_impact > 50
+ORDER BY migs.avg_total_user_cost * migs.avg_user_impact * (migs.user_seeks + migs.user_scans) DESC
+""")
+
+
+def check_unused_indexes(conn):
+    try:
+        engine = get_engine_from_conn(conn)
+        with engine.connect() as c:
+            result = c.execute(UNUSED_INDEX_QUERY)
+            rows = [dict(r._mapping) for r in result]
+        engine.dispose()
+        return {
+            "status": "success",
+            "count": len(rows),
+            "indexes": rows
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def check_missing_indexes(conn):
+    try:
+        engine = get_engine_from_conn(conn)
+        with engine.connect() as c:
+            result = c.execute(MISSING_INDEX_QUERY)
+            rows = [dict(r._mapping) for r in result]
+        engine.dispose()
+        return {
+            "status": "success",
+            "count": len(rows),
+            "indexes": rows
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def create_missing_index(conn, group_handle):
+    try:
+        engine = get_engine_from_conn(conn)
+        script = None
+        with engine.connect() as c:
+            result = c.execute(MISSING_INDEX_QUERY)
+            for r in result:
+                if str(r._mapping["group_handle"]) == str(group_handle):
+                    script = r._mapping["create_script"]
+                    break
+            
+            if not script:
+                return {"status": "error", "message": f"No se encontró recomendación para el ID {group_handle}"}
+            
+            trans = c.begin()
+            try:
+                c.execute(text(script))
+                trans.commit()
+                return {"status": "success", "message": f"Índice creado exitosamente", "script": script}
+            except Exception as e:
+                trans.rollback()
+                return {"status": "error", "message": f"Error ejecutando script: {str(e)}", "script": script}
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        engine.dispose()
+
+
+def execute_index_optimization(conn):
+    try:
+        engine = get_engine_from_conn(conn)
+        dropped_indexes = []
+        created_indexes = []
+        errors = []
+        
+        # 1. Eliminar índices inútiles
+        unused = check_unused_indexes(conn)
+        if unused.get('status') == 'success':
+            with engine.connect() as c:
+                for idx in unused.get('indexes', []):
+                    script = idx['drop_script']
+                    trans = c.begin()
+                    try:
+                        c.execute(text(script))
+                        trans.commit()
+                        dropped_indexes.append(f"{idx['index_name']} ({idx['table_name']})")
+                    except Exception as e:
+                        trans.rollback()
+                        errors.append(f"Error al eliminar {idx['index_name']}: {str(e)}")
+                        
+        # 2. Crear índices faltantes
+        missing = check_missing_indexes(conn)
+        if missing.get('status') == 'success':
+            with engine.connect() as c:
+                for idx in missing.get('indexes', []):
+                    script = idx['create_script']
+                    trans = c.begin()
+                    try:
+                        c.execute(text(script))
+                        trans.commit()
+                        created_indexes.append(f"Auto_Missing_{idx['group_handle']} ({idx['table_name'].split('.')[-1].replace('[','').replace(']','')})")
+                    except Exception as e:
+                        trans.rollback()
+                        errors.append(f"Error al crear índice sugerido para {idx['table_name']}: {str(e)}")
+                        
+        return {
+            "status": "success",
+            "dropped": dropped_indexes,
+            "created": created_indexes,
+            "errors": errors
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        engine.dispose()
+
+
+def check_connections(conn):
+    try:
+        engine = get_engine_from_conn(conn)
+        query = text("""
+            SELECT status, COUNT(*) as count 
+            FROM sys.dm_exec_sessions 
+            WHERE database_id = DB_ID() AND is_user_process = 1
+            GROUP BY status
+        """)
+        with engine.connect() as c:
+            result = c.execute(query)
+            rows = [{"status": r._mapping["status"], "count": r._mapping["count"]} for r in result]
+        engine.dispose()
+        return {
+            "status": "success",
+            "connections": rows,
+            "total": sum(r["count"] for r in rows)
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

@@ -57,7 +57,8 @@ Asegúrate de que tu contenedor de SQL Server esté ejecutándose e inyecta la b
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate
+venv\Scripts\activate  # En Windows
+# source venv/bin/activate # En Linux/Mac
 pip install -r requirements.txt
 ```
 Configura tu archivo `.env` con tus claves de IA:
@@ -67,16 +68,32 @@ GROQ_API_KEY=tu_clave
 TRANSFORMERS_OFFLINE=1
 LITELLM_TELEMETRY=False
 ```
-Inicia el servidor de Flask:
-```bash
-python run.py
-```
 
 ### 3. Configuración del Frontend (React/Vite)
 ```bash
 cd frontend
-pnpm install
-pnpm run dev
+npm install
+```
+
+### 4. Ejecución del Proyecto
+Para iniciar ambos servicios (Backend y Frontend) simultáneamente y de forma automática en Windows, ejecuta el script proporcionado en la raíz del proyecto:
+```bash
+start.bat
+```
+
+Alternativamente, puedes ejecutarlos de forma manual en terminales separadas:
+
+**Backend**:
+```bash
+cd backend
+venv\Scripts\activate
+python run.py
+```
+
+**Frontend**:
+```bash
+cd frontend
+npm run dev
 ```
 
 ## 🧠 Flujo de Trabajo del Agente IA (AI_Service)

@@ -9,6 +9,7 @@ function Sidebar({ activeView, setActiveView, configTab, setConfigTab }) {
     { view: 'reports', label: 'Reportes', icon: FileText },
     { view: 'maintenance', label: 'Mantenimiento', icon: Wrench },
     { view: 'monitoring', label: 'Monitoreo', icon: Activity },
+    { view: 'index_health', label: 'Salud de Índices', icon: Activity },
     { view: 'openwa', label: 'Puente OpenWA', icon: MessageSquare },
     { view: 'ai_config', label: 'Configuración IA', icon: Cpu },
     { view: 'chat_test', label: 'Chat de Prueba', icon: MessageSquare },

@@ -8,7 +8,9 @@ wsp_service = WhatsAppService()
 
 
 def run_alert_check():
-    with db.app.app_context():
+    from app import create_app
+    app = create_app()
+    with app.app_context():
         conn = DatabaseConnection.query.filter_by(is_active=True).first()
         if not conn:
             print("[alert_job] No hay base de datos activa")
