@@ -5,7 +5,6 @@ import KPICard from '../components/dashboard/KPICard';
 import HeatMap from '../components/dashboard/HeatMap';
 import TrendChart from '../components/dashboard/TrendChart';
 import DonutChart from '../components/dashboard/DonutChart';
-import PDFReportButton from '../components/dashboard/PDFReportButton';
 
 function DashboardPage() {
   const [dbStats, setDbStats] = useState(null);
@@ -70,7 +69,6 @@ function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {activeDb && <PDFReportButton dbStats={dbStats} fragData={fragData} activeDb={activeDb} />}
           <button onClick={loadData} className="btn-accent py-2 px-4 text-sm font-mono flex items-center gap-2">
             <Activity size={16} /> Actualizar
           </button>
@@ -121,6 +119,11 @@ function DashboardPage() {
              </div>
           </div>
 
+          <div className="grid grid-cols-1 gap-6">
+             <HeatMap data={fragData} />
+             <TrendChart data={fragData.slice(0, 15)} tableName="Top 15 Fragmentadas" />
+          </div>
+
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <DonutChart 
@@ -138,15 +141,6 @@ function DashboardPage() {
               colors={['rgba(239, 68, 68, 0.8)', 'rgba(234, 179, 8, 0.8)', 'rgba(34, 197, 94, 0.8)']}
               emptyMessage="Sin acciones sugeridas."
             />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-             <div className="lg:col-span-1">
-               <HeatMap data={fragData} />
-             </div>
-             <div className="lg:col-span-1">
-               <TrendChart data={fragData.slice(0, 15)} tableName="Top 15 Fragmentadas" />
-             </div>
           </div>
         </>
       )}
