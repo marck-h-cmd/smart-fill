@@ -469,9 +469,40 @@ def _handle_command(text, active_bot_session, chat_id):
         context_service.add_event(chat_id, "command_result", f"/historial {table_name or ''}")
 
     elif command == '/alertas':
-        response = _format_alertas()
-        _send_reply(active_bot_session, chat_id, response)
-        context_service.add_event(chat_id, "command_result", "/alertas consultado")
+        if args and args[0] == 'set' and len(args) >= 3:
+            from app.models.base import Configuracion
+            from app.extensions import db
+            if args[1] == 'umbral':
+                try:
+                    val = float(args[2])
+                    conf = Configuracion.query.filter_by(clave='alert_umbral').first()
+                    if not conf:
+                        conf = Configuracion(clave='alert_umbral', valor=str(val))
+                        db.session.add(conf)
+                    else:
+                        conf.valor = str(val)
+                    db.session.commit()
+                    response = f"✅ Umbral de alerta actualizado a {val}%"
+                except:
+                    response = "❌ Valor de umbral inválido. Usa un número, ej: /alertas set umbral 25"
+            elif args[1] == 'horario':
+                val = args[2]
+                conf = Configuracion.query.filter_by(clave='horario_mantenimiento').first()
+                if not conf:
+                    conf = Configuracion(clave='horario_mantenimiento', valor=val)
+                    db.session.add(conf)
+                else:
+                    conf.valor = val
+                db.session.commit()
+                response = f"✅ Horario de mantenimiento actualizado a {val}"
+            else:
+                response = "⚠️ Uso incorrecto. Ej: /alertas set umbral 25 o /alertas set horario 02:00"
+            _send_reply(active_bot_session, chat_id, response)
+            context_service.add_event(chat_id, "command_result", "/alertas set ejecutado")
+        else:
+            response = _format_alertas()
+            _send_reply(active_bot_session, chat_id, response)
+            context_service.add_event(chat_id, "command_result", "/alertas consultado")
 
     elif command == '/alertar':
         try:
@@ -528,6 +559,32 @@ def chat_test():
     db_str = _get_cached_db_context(conn.id, lambda: _build_db_context_fast(conn)) if conn else ""
     chat_str = context_service.get_context("TEST_GUI")
     context_service.add_event("TEST_GUI", "message", user_text)
+
+    if user_text.startswith('/'):
+        # Intercept commands to run them via _handle_command and capture output
+        import app.api.routes.whatsapp as wa
+        original_send = wa._send_reply
+        response_container = []
+        def mock_send(session_id, cid, text):
+            response_container.append(text)
+        wa._send_reply = mock_send
+        try:
+            wa._handle_command(user_text, 'mock_session', "TEST_GUI")
+        finally:
+            wa._send_reply = original_send
+
+        res_text = response_container[0] if response_container else "⚠️ Comando procesado pero sin respuesta."
+        context_service.add_event("TEST_GUI", "ai_response", res_text[:300])
+        
+        def generate_command():
+            yield f"data: {res_text.replace(chr(10), '\\n')}\n\n"
+            yield "data: __END__\n\n"
+            
+        return Response(
+            stream_with_context(generate_command()),
+            mimetype="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+        )
 
     def generate():
         full_response = []
