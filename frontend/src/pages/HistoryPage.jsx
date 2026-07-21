@@ -22,7 +22,7 @@ function HistoryChart({ records, selectedTable }) {
     const labels = sortedRecords.map(r => 
       selectedTable 
         ? new Date(r.ultima_actualizacion).toLocaleDateString() + ' ' + new Date(r.ultima_actualizacion).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : r.nombre_tabla
+        : r.index_name || r.nombre_tabla
     );
 
     const values = sortedRecords.map(r => r.fragmentacion_porcentaje);
@@ -64,7 +64,14 @@ function HistoryChart({ records, selectedTable }) {
             grid: { color: 'rgba(150, 150, 150, 0.15)' }
           },
           x: {
-            ticks: { color: '#888888', font: { size: 11 } },
+            ticks: { 
+              color: '#888888', 
+              font: { size: 11 },
+              callback: function(val, index) {
+                const label = this.getLabelForValue(val);
+                return label.length > 15 && !selectedTable ? label.substr(0, 15) + '...' : label;
+              }
+            },
             grid: { display: false }
           }
         }
@@ -99,10 +106,10 @@ function HistoryPage() {
   const [selectedTable, setSelectedTable] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const loadHistory = useCallback(async (table) => {
+  const loadHistory = useCallback(async (indexName) => {
     setLoading(true);
     try {
-      const params = table ? `?table=${encodeURIComponent(table)}` : '';
+      const params = indexName ? `?index=${encodeURIComponent(indexName)}` : '';
       const res = await axios.get(`http://localhost:5000/api/history${params}`);
       setRecords(res.data.data || []);
     } catch (err) { console.error(err); }
@@ -123,10 +130,10 @@ function HistoryPage() {
 
       <div className="flex gap-3 items-end">
         <div className="flex-1">
-          <label className="block text-xs font-mono text-fgMuted mb-1">Filtrar por tabla</label>
+          <label className="block text-xs font-mono text-fgMuted mb-1">Filtrar por Índice</label>
           <select value={selectedTable} onChange={e => setSelectedTable(e.target.value)}
             className="w-full bg-surface border border-border p-3 focus:outline-none focus:border-accent text-sm font-mono">
-            <option value="">Todas las tablas</option>
+            <option value="">Todos los índices</option>
             {tables.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
@@ -152,24 +159,26 @@ function HistoryPage() {
             <table className="w-full text-sm font-mono">
               <thead>
                 <tr className="hairline-b bg-panel">
+                  <th className="text-left p-3 text-fgMuted text-xs">Índice</th>
                   <th className="text-left p-3 text-fgMuted text-xs">Tabla</th>
                   <th className="text-right p-3 text-fgMuted text-xs">Fragmentación</th>
                   <th className="text-right p-3 text-fgMuted text-xs">FillFactor</th>
                   <th className="text-right p-3 text-fgMuted text-xs">Filas</th>
-                  <th className="text-right p-3 text-fgMuted text-xs">Última Actualización</th>
+                  <th className="text-right p-3 text-fgMuted text-xs">Fecha (UTC)</th>
                 </tr>
               </thead>
               <tbody>
                 {records.map((r, i) => (
                   <tr key={i} className="hairline-b hover:bg-border/20 transition-colors">
-                    <td className="p-3">{r.nombre_tabla}</td>
+                    <td className="p-3 font-semibold text-fg">{r.index_name || '-'}</td>
+                    <td className="p-3 text-fgMuted">{r.nombre_tabla}</td>
                     <td className={`p-3 text-right ${
                       r.fragmentacion_porcentaje >= 30 ? 'text-red-400' :
                       r.fragmentacion_porcentaje >= 10 ? 'text-yellow-400' : 'text-green-400'
                     }`}>{r.fragmentacion_porcentaje}%</td>
                     <td className="p-3 text-right">{r.fillfactor_actual}</td>
                     <td className="p-3 text-right">{r.total_filas}</td>
-                    <td className="p-3 text-right text-fgMuted text-xs">{r.ultima_actualizacion?.slice(0, 19)}</td>
+                    <td className="p-3 text-right text-fgMuted text-xs">{r.ultima_actualizacion?.slice(0, 19).replace('T', ' ')}</td>
                   </tr>
                 ))}
               </tbody>

@@ -20,10 +20,10 @@ def reset_and_seed_db():
         db.session.add_all([conf1, conf2])
 
         # Seed Tablas Mockeadas
-        t1 = TablaMetricas(nombre_tabla='Ventas', fragmentacion_porcentaje=45.5, fillfactor_actual=100, total_filas=1500000)
-        t2 = TablaMetricas(nombre_tabla='Usuarios', fragmentacion_porcentaje=5.2, fillfactor_actual=90, total_filas=50000)
-        t3 = TablaMetricas(nombre_tabla='Logs', fragmentacion_porcentaje=80.1, fillfactor_actual=100, total_filas=5000000)
-        t4 = TablaMetricas(nombre_tabla='Productos', fragmentacion_porcentaje=15.0, fillfactor_actual=85, total_filas=2500)
+        t1 = TablaMetricas(nombre_tabla='Ventas', index_name='IX_Ventas_Fecha', fragmentacion_porcentaje=45.5, fillfactor_actual=100, total_filas=1500000)
+        t2 = TablaMetricas(nombre_tabla='Usuarios', index_name='PK_Usuarios', fragmentacion_porcentaje=5.2, fillfactor_actual=90, total_filas=50000)
+        t3 = TablaMetricas(nombre_tabla='Logs', index_name='IX_Logs_Level', fragmentacion_porcentaje=80.1, fillfactor_actual=100, total_filas=5000000)
+        t4 = TablaMetricas(nombre_tabla='Productos', index_name='PK_Productos', fragmentacion_porcentaje=15.0, fillfactor_actual=85, total_filas=2500)
         
         db.session.add_all([t1, t2, t3, t4])
         db.session.commit()

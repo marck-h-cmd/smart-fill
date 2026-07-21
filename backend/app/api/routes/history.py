@@ -6,14 +6,14 @@ bp = Blueprint('history', __name__, url_prefix='/api/history')
 
 @bp.route('', methods=['GET'])
 def list_history():
-    table = request.args.get('table')
-    limit = request.args.get('limit', 50, type=int)
-    data = get_history(table_name=table, limit=limit)
+    index_name = request.args.get('index')
+    limit = request.args.get('limit', 200, type=int)
+    data = get_history(index_name=index_name, limit=limit)
     return jsonify({"status": "success", "data": data})
 
 @bp.route('/tables', methods=['GET'])
 def get_tables():
-    # Retorna la lista única de nombres de tablas de las cuales hay historial
-    query = TablaMetricas.query.with_entities(TablaMetricas.nombre_tabla).distinct()
-    tables = [row.nombre_tabla for row in query.all()]
-    return jsonify({"status": "success", "data": tables})
+    # Retorna la lista única de nombres de índices de los cuales hay historial
+    query = TablaMetricas.query.with_entities(TablaMetricas.index_name).distinct().filter(TablaMetricas.index_name != None)
+    indexes = [row.index_name for row in query.all() if row.index_name]
+    return jsonify({"status": "success", "data": indexes})
