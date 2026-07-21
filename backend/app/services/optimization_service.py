@@ -1,5 +1,7 @@
 from sqlalchemy import text
 from app.services.database_service import get_engine_from_conn
+from app.extensions import db
+from datetime import datetime
 
 def generate_script(table_name, action, fill_factor=None):
     if action == 'REBUILD':
@@ -42,6 +44,18 @@ def execute_optimization(conn, table_name):
             try:
                 c.execute(text(plan['script']))
                 trans.commit()
+                
+                # Update history metrics immediately after successful optimization
+                try:
+                    from app.models.base import TablaMetricas
+                    metric = TablaMetricas.query.filter_by(nombre_tabla=table_name).first()
+                    if metric:
+                        metric.fragmentacion_porcentaje = 0
+                        metric.ultima_actualizacion = datetime.utcnow()
+                        db.session.commit()
+                except Exception as ex:
+                    print(f"Advertencia: No se pudo actualizar el historial para {table_name}: {ex}")
+
                 return {
                     'success': True,
                     'action': plan['action'],
