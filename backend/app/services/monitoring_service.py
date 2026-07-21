@@ -141,6 +141,7 @@ def run_full_check(conn, alert_umbral=30):
         "space": space_result
     }
 
+
 UNUSED_INDEX_QUERY = text("""
 SELECT
     OBJECT_NAME(s.object_id) AS table_name,
@@ -219,11 +220,11 @@ def check_missing_indexes(conn):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+
 def create_missing_index(conn, group_handle):
     try:
         engine = get_engine_from_conn(conn)
         script = None
-        # Buscar el script de creacion para ese group_handle
         with engine.connect() as c:
             result = c.execute(MISSING_INDEX_QUERY)
             for r in result:
@@ -234,7 +235,6 @@ def create_missing_index(conn, group_handle):
             if not script:
                 return {"status": "error", "message": f"No se encontró recomendación para el ID {group_handle}"}
             
-            # Ejecutar script
             trans = c.begin()
             try:
                 c.execute(text(script))
@@ -248,6 +248,56 @@ def create_missing_index(conn, group_handle):
         return {"status": "error", "message": str(e)}
     finally:
         engine.dispose()
+
+
+def execute_index_optimization(conn):
+    try:
+        engine = get_engine_from_conn(conn)
+        dropped_indexes = []
+        created_indexes = []
+        errors = []
+        
+        # 1. Eliminar índices inútiles
+        unused = check_unused_indexes(conn)
+        if unused.get('status') == 'success':
+            with engine.connect() as c:
+                for idx in unused.get('indexes', []):
+                    script = idx['drop_script']
+                    trans = c.begin()
+                    try:
+                        c.execute(text(script))
+                        trans.commit()
+                        dropped_indexes.append(f"{idx['index_name']} ({idx['table_name']})")
+                    except Exception as e:
+                        trans.rollback()
+                        errors.append(f"Error al eliminar {idx['index_name']}: {str(e)}")
+                        
+        # 2. Crear índices faltantes
+        missing = check_missing_indexes(conn)
+        if missing.get('status') == 'success':
+            with engine.connect() as c:
+                for idx in missing.get('indexes', []):
+                    script = idx['create_script']
+                    trans = c.begin()
+                    try:
+                        c.execute(text(script))
+                        trans.commit()
+                        created_indexes.append(f"Auto_Missing_{idx['group_handle']} ({idx['table_name'].split('.')[-1].replace('[','').replace(']','')})")
+                    except Exception as e:
+                        trans.rollback()
+                        errors.append(f"Error al crear índice sugerido para {idx['table_name']}: {str(e)}")
+                        
+        return {
+            "status": "success",
+            "dropped": dropped_indexes,
+            "created": created_indexes,
+            "errors": errors
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        engine.dispose()
+
 
 def check_connections(conn):
     try:

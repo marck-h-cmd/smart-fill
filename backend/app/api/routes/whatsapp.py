@@ -238,6 +238,43 @@ def _format_optimizar_all(conn):
     else:
         return f"❌ Error en optimización masiva: {res.get('message', 'Desconocido')}"
 
+def _format_optimizar_indices(conn):
+    from app.services.monitoring_service import execute_index_optimization
+    res = execute_index_optimization(conn)
+    if res.get('status') == 'success':
+        dropped = res.get('dropped', [])
+        created = res.get('created', [])
+        errors = res.get('errors', [])
+        
+        lines = ["🛠️ *OPTIMIZACIÓN ESTRUCTURAL DE ÍNDICES*"]
+        lines.append(f"Base de datos: {conn.database}\n")
+        
+        if dropped:
+            lines.append("🗑️ *Índices inútiles eliminados:*")
+            for d in dropped:
+                lines.append(f"  • {d}")
+        else:
+            lines.append("✨ No se encontraron índices inútiles para eliminar.")
+            
+        lines.append("")
+        
+        if created:
+            lines.append("⚡ *Índices faltantes creados:*")
+            for c in created:
+                lines.append(f"  • {c}")
+        else:
+            lines.append("✨ No se encontraron índices faltantes para crear.")
+            
+        if errors:
+            lines.append("")
+            lines.append("⚠️ *Errores durante la ejecución:*")
+            for err in errors:
+                lines.append(f"  • {err}")
+                
+        return "\n".join(lines)
+    else:
+        return f"❌ *Error al optimizar estructura:* {res.get('message', 'Desconocido')}"
+
 def _format_dashboard():
     from app.models.base import Configuracion
     frontend_url_conf = Configuracion.query.filter_by(clave='frontend_url').first()
@@ -250,6 +287,7 @@ def _format_dashboard():
         f"👉 {frontend_url}"
     ]
     return "\n".join(lines)
+
 
 def _format_comandos():
     lines = [
@@ -288,19 +326,23 @@ def _format_comandos():
         "10. /crear_indice <id>",
         "   → Crea un índice faltante sugerido por el análisis",
         "",
-        "11. /espacio",
+        "11. /optimizar_indices (o /limpiar_indices)",
+        "   → Elimina índices inútiles y crea todos los índices faltantes de forma automática",
+        "",
+        "12. /espacio",
         "   → Reporte detallado de uso de espacio en disco de la base de datos",
         "",
-        "12. /conexiones",
+        "13. /conexiones",
         "   → Muestra las conexiones activas a la base de datos por estado",
         "",
-        "13. /dashboard",
+        "14. /dashboard",
         "   → Obtiene la URL de acceso a la consola web SmartFill",
         "",
         "💡 *Para consultas libres:* Mencióname con @BotSmartfill seguido de tu pregunta.",
         "   Ejemplo: @BotSmartfill ¿qué tabla tiene más fragmentación?"
     ]
     return "\n".join(lines)
+
 
 
 def _send_reply(session_id, chat_id, text):
@@ -391,6 +433,15 @@ def _handle_command(text, active_bot_session, chat_id):
             response = f"❌ Error al crear índice: {str(e)}"
         _send_reply(active_bot_session, chat_id, response)
         context_service.add_event(chat_id, "command_result", f"/crear_indice {group_handle}")
+
+    elif command == '/optimizar_indices' or command == '/limpiar_indices':
+        try:
+            response = _format_optimizar_indices(conn)
+        except Exception as e:
+            response = f"❌ Error al optimizar estructura de índices: {str(e)}"
+        _send_reply(active_bot_session, chat_id, response)
+        context_service.add_event(chat_id, "command_result", "/optimizar_indices ejecutado")
+
 
     elif command == '/espacio':
         try:

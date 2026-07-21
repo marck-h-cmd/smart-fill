@@ -45,9 +45,9 @@ export default function IndexHealth() {
   if (!activeDb) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-        <Database className="w-16 h-16 text-slate-600 mb-4" />
-        <h2 className="text-2xl font-bold text-slate-300">No hay base de datos activa</h2>
-        <p className="text-slate-500 mt-2">Selecciona una base de datos en el Dashboard para ver el estado de los índices.</p>
+        <Database className="w-16 h-16 text-fgMuted mb-4" />
+        <h2 className="text-2xl font-bold text-fg">No hay base de datos activa</h2>
+        <p className="text-fgMuted mt-2">Selecciona una base de datos en el Dashboard para ver el estado de los índices.</p>
       </div>
     );
   }
@@ -56,18 +56,18 @@ export default function IndexHealth() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-2">
-            <Activity className="w-8 h-8 text-teal-400" />
+          <h1 className="text-3xl font-bold text-fg flex items-center gap-2">
+            <Activity className="w-8 h-8 text-accent" />
             Salud de Índices
           </h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-fgMuted mt-1">
             Detecta índices inútiles que ralentizan escrituras y descubre índices faltantes recomendados.
           </p>
         </div>
         <button
           onClick={() => fetchHealthData(activeDb.id)}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700"
+          className="flex items-center gap-2 px-4 py-2 bg-panel hover:bg-surface text-fg rounded-lg transition-colors border border-border"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Actualizar
@@ -86,43 +86,43 @@ export default function IndexHealth() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-slate-800/50 backdrop-blur-md rounded-2xl border border-slate-700 p-6 shadow-xl"
+          className="panel p-6 rounded-2xl shadow-sm"
         >
-          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-yellow-400" />
+          <h2 className="text-xl font-bold text-fg mb-4 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-yellow-500" />
             Índices Inútiles ({unusedIndexes.length})
           </h2>
-          <p className="text-slate-400 text-sm mb-4">
+          <p className="text-fgMuted text-sm mb-4">
             Índices que no han sido utilizados para búsquedas, pero consumen recursos durante las operaciones de escritura (INSERT/UPDATE/DELETE).
           </p>
           
           {loading ? (
             <div className="animate-pulse space-y-3">
-              {[1, 2, 3].map(i => <div key={i} className="h-16 bg-slate-700/50 rounded-lg" />)}
+              {[1, 2, 3].map(i => <div key={i} className="h-16 bg-border/50 rounded-lg" />)}
             </div>
           ) : unusedIndexes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-slate-500 border border-dashed border-slate-700 rounded-xl bg-slate-800/30">
-              <CheckCircle className="w-8 h-8 text-green-400 mb-2" />
+            <div className="flex flex-col items-center justify-center p-8 text-fgMuted border border-dashed border-border rounded-xl bg-surface/30">
+              <CheckCircle className="w-8 h-8 text-green-500 mb-2" />
               <p>No se encontraron índices inútiles.</p>
             </div>
           ) : (
             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
               {unusedIndexes.map((idx, i) => (
-                <div key={i} className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 hover:border-slate-600 transition-colors">
+                <div key={i} className="bg-surface/50 p-4 rounded-xl border border-border hover:border-accent transition-colors">
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <span className="text-xs font-semibold px-2 py-1 bg-slate-800 text-slate-300 rounded-full border border-slate-700">
+                      <span className="text-xs font-semibold px-2 py-1 bg-panel text-fgMuted rounded-full border border-border">
                         {idx.table_name}
                       </span>
-                      <h3 className="text-white font-medium mt-2">{idx.index_name}</h3>
+                      <h3 className="text-fg font-medium mt-2">{idx.index_name}</h3>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm text-slate-400">Escrituras</div>
-                      <div className="text-lg font-bold text-yellow-400">{idx.writes.toLocaleString()}</div>
+                      <div className="text-sm text-fgMuted">Escrituras</div>
+                      <div className="text-lg font-bold text-yellow-500">{idx.writes.toLocaleString()}</div>
                     </div>
                   </div>
-                  <div className="mt-3 bg-slate-950 p-3 rounded-lg overflow-x-auto border border-slate-800">
-                    <pre className="text-xs text-slate-300">{idx.drop_script}</pre>
+                  <div className="mt-3 bg-panel p-3 rounded-lg overflow-x-auto border border-border">
+                    <pre className="text-xs text-fg font-mono">{idx.drop_script}</pre>
                   </div>
                 </div>
               ))}
@@ -135,48 +135,48 @@ export default function IndexHealth() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-slate-800/50 backdrop-blur-md rounded-2xl border border-slate-700 p-6 shadow-xl"
+          className="panel p-6 rounded-2xl shadow-sm"
         >
-          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-teal-400" />
+          <h2 className="text-xl font-bold text-fg mb-4 flex items-center gap-2">
+            <Activity className="w-5 h-5 text-accent" />
             Índices Faltantes ({missingIndexes.length})
           </h2>
-          <p className="text-slate-400 text-sm mb-4">
+          <p className="text-fgMuted text-sm mb-4">
             Recomendaciones automáticas de SQL Server basadas en consultas que se han ejecutado recientemente.
           </p>
 
           {loading ? (
             <div className="animate-pulse space-y-3">
-              {[1, 2, 3].map(i => <div key={i} className="h-24 bg-slate-700/50 rounded-lg" />)}
+              {[1, 2, 3].map(i => <div key={i} className="h-24 bg-border/50 rounded-lg" />)}
             </div>
           ) : missingIndexes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-slate-500 border border-dashed border-slate-700 rounded-xl bg-slate-800/30">
-              <CheckCircle className="w-8 h-8 text-green-400 mb-2" />
+            <div className="flex flex-col items-center justify-center p-8 text-fgMuted border border-dashed border-border rounded-xl bg-surface/30">
+              <CheckCircle className="w-8 h-8 text-green-500 mb-2" />
               <p>No se encontraron recomendaciones de índices faltantes.</p>
             </div>
           ) : (
             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
               {missingIndexes.map((idx, i) => (
-                <div key={i} className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 hover:border-slate-600 transition-colors">
-                  <div className="flex justify-between items-start mb-3 border-b border-slate-700/50 pb-3">
+                <div key={i} className="bg-surface/50 p-4 rounded-xl border border-border hover:border-accent transition-colors">
+                  <div className="flex justify-between items-start mb-3 border-b border-border pb-3">
                     <div>
-                      <span className="text-xs font-semibold px-2 py-1 bg-slate-800 text-slate-300 rounded-full border border-slate-700">
+                      <span className="text-xs font-semibold px-2 py-1 bg-panel text-fgMuted rounded-full border border-border">
                         {idx.table_name}
                       </span>
                     </div>
                     <div className="text-right flex gap-4">
                       <div>
-                        <div className="text-xs text-slate-500">Impacto</div>
-                        <div className="text-sm font-bold text-teal-400">{Math.round(idx.avg_user_impact)}%</div>
+                        <div className="text-xs text-fgMuted">Impacto</div>
+                        <div className="text-sm font-bold text-accent">{Math.round(idx.avg_user_impact)}%</div>
                       </div>
                       <div>
-                        <div className="text-xs text-slate-500">Búsquedas</div>
-                        <div className="text-sm font-bold text-blue-400">{idx.user_seeks + idx.user_scans}</div>
+                        <div className="text-xs text-fgMuted">Búsquedas</div>
+                        <div className="text-sm font-bold text-blue-500">{idx.user_seeks + idx.user_scans}</div>
                       </div>
                     </div>
                   </div>
-                  <div className="bg-slate-950 p-3 rounded-lg overflow-x-auto border border-slate-800">
-                    <pre className="text-xs text-teal-300 whitespace-pre-wrap">{idx.create_script}</pre>
+                  <div className="bg-panel p-3 rounded-lg overflow-x-auto border border-border">
+                    <pre className="text-xs text-accent whitespace-pre-wrap font-mono">{idx.create_script}</pre>
                   </div>
                 </div>
               ))}
