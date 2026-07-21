@@ -52,7 +52,16 @@ def execute_optimization(conn, table_name):
                     if metric:
                         metric.fragmentacion_porcentaje = 0
                         metric.ultima_actualizacion = datetime.utcnow()
-                        db.session.commit()
+                    else:
+                        metric = TablaMetricas(
+                            nombre_tabla=table_name,
+                            fragmentacion_porcentaje=0,
+                            fillfactor_actual=plan.get('suggested_fillfactor') or 100,
+                            total_filas=0,
+                            ultima_actualizacion=datetime.utcnow()
+                        )
+                        db.session.add(metric)
+                    db.session.commit()
                 except Exception as ex:
                     print(f"Advertencia: No se pudo actualizar el historial para {table_name}: {ex}")
 
