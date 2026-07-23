@@ -1,13 +1,13 @@
 -- ========================================================================================
--- SCRIPT DE DEMOSTRACIÓN PARA SMARTFILL (VERSIÓN: SISTEMA DE VENTAS REAL)
+-- SCRIPT DE DEMOSTRACIÓN PARA SMARTFILL (VERSIÓN: SISTEMA DE VENTAS AVANZADO)
 -- Este script crea una base de datos de ventas ("SmartFill_VentasDB") y genera 
 -- escenarios artificiales técnicos (fragmentación, índices faltantes, índices inútiles) 
 -- simulando operaciones reales de un negocio (inserts, updates, queries) para probar
--- todas las funcionalidades de SmartFill.
+-- TODAS las funcionalidades del software SmartFill.
 --
 -- INSTRUCCIONES:
 -- Ejecute este script completo en SQL Server Management Studio (SSMS).
--- Dependiendo del rendimiento de su PC, puede tardar entre 10 y 30 segundos.
+-- Dependiendo del rendimiento de su PC, puede tardar entre 15 y 40 segundos.
 -- ========================================================================================
 
 USE master;
@@ -28,7 +28,7 @@ USE SmartFill_VentasDB;
 GO
 
 -- ========================================================================================
--- ESCENARIO 1: TABLA MUY FRAGMENTADA (Para probar /optimizar y REBUILD)
+-- ESCENARIO 1: TABLA MUY FRAGMENTADA (Para probar /optimizar y REBUILD, Nivel Crítico)
 -- Tabla: Pedidos
 -- Técnica: Usamos un Clustered Index sobre un UNIQUEIDENTIFIER (GUID aleatorio).
 -- Al simular la entrada de miles de pedidos con IDs desordenados, forzamos 
@@ -45,16 +45,16 @@ CREATE TABLE Pedidos (
 GO
 
 SET NOCOUNT ON;
-PRINT 'Generando miles de Pedidos (Fragmentación Alta)...';
+PRINT 'Generando miles de Pedidos (Fragmentación CRÍTICA > 30%)...';
 DECLARE @i INT = 0;
-WHILE @i < 5000
+WHILE @i < 8000
 BEGIN
     INSERT INTO Pedidos (ClienteId, VendedorId, Estado, Comentarios) 
     VALUES (
         ABS(CHECKSUM(NEWID())) % 5000 + 1, 
         ABS(CHECKSUM(NEWID())) % 50 + 1, 
         CHOOSE((@i % 4) + 1, 'Pendiente', 'Enviado', 'Entregado', 'Cancelado'),
-        REPLICATE('A', 150) -- Relleno para hacer la fila pesada
+        REPLICATE('A', 200) -- Relleno para hacer la fila pesada
     );
     SET @i = @i + 1;
 END
@@ -65,7 +65,7 @@ GO
 -- Tabla: Clientes
 -- Técnica: ID secuencial (sin fragmentación inicial), pero luego los clientes actualizan
 -- su perfil y añaden direcciones muy largas, expandiendo el tamaño de la fila y causando
--- fragmentación por "Forwarded Records" y "Page Splits" secundarios.
+-- fragmentación por "Forwarded Records" y "Page Splits" secundarios al 15%-25%.
 -- ========================================================================================
 CREATE TABLE Clientes (
     ClienteId INT IDENTITY(1,1) PRIMARY KEY CLUSTERED,
@@ -76,9 +76,9 @@ CREATE TABLE Clientes (
 );
 GO
 
-PRINT 'Registrando Clientes (Fragmentación Moderada por Updates)...';
+PRINT 'Registrando Clientes (Fragmentación MODERADA 10%-30%)...';
 DECLARE @j INT = 0;
-WHILE @j < 3000
+WHILE @j < 5000
 BEGIN
     INSERT INTO Clientes (NombreCompleto, Email, Telefono, DireccionEnvio) 
     VALUES ('Cliente Generico ' + CAST(@j AS NVARCHAR), 'cliente' + CAST(@j AS NVARCHAR) + '@mail.com', '555-0000', 'Direccion Corta');
@@ -89,14 +89,14 @@ GO
 -- Los clientes completan sus perfiles con direcciones larguísimas (causa expansión de la fila)
 UPDATE Clientes
 SET DireccionEnvio = REPLICATE('X', 450)
-WHERE ClienteId % 3 = 0; 
+WHERE ClienteId % 2 = 0; 
 GO
 
 -- ========================================================================================
--- ESCENARIO 3: TABLA SALUDABLE
--- Tabla: Productos
--- Técnica: Catálogo de productos. Inserciones puramente secuenciales, sin actualizaciones
--- masivas que cambien el tamaño de fila. La fragmentación se mantendrá cerca al 0%.
+-- ESCENARIO 3: TABLA SALUDABLE Y VARIOS ÍNDICES INÚTILES
+-- Tabla: Productos y Auditoria_Log
+-- Técnica: Inserciones puramente secuenciales, fragmentación < 10%.
+-- Además, creamos MUCHOS índices en columnas que nunca usamos en filtros (WHERE).
 -- ========================================================================================
 CREATE TABLE Productos (
     ProductoId INT IDENTITY(1,1) PRIMARY KEY CLUSTERED,
@@ -107,9 +107,12 @@ CREATE TABLE Productos (
 );
 GO
 
-PRINT 'Poblando Catálogo de Productos (Tabla Saludable)...';
+-- Índice inútil (nadie busca productos por nombre exacto en este sistema backend)
+CREATE NONCLUSTERED INDEX IX_Productos_Nombre ON Productos(NombreProducto);
+
+PRINT 'Poblando Catálogo de Productos (Tabla SALUDABLE < 10%)...';
 DECLARE @k INT = 0;
-WHILE @k < 1000
+WHILE @k < 3000
 BEGIN
     INSERT INTO Productos (CodigoSKU, NombreProducto, Precio, StockActual) 
     VALUES (
@@ -122,80 +125,101 @@ BEGIN
 END
 GO
 
--- ========================================================================================
--- ESCENARIO 4: ÍNDICES INÚTILES (Para probar la sección "Salud de Índices")
--- Tabla: Vendedores
--- Técnica: Creamos un par de índices en una tabla donde frecuentemente registramos
--- asistencias o ventas (puras inserciones) pero NUNCA consultamos por esos campos.
--- ========================================================================================
-CREATE TABLE Vendedores (
-    VendedorId INT IDENTITY(1,1) PRIMARY KEY CLUSTERED,
-    Nombre NVARCHAR(100),
-    Region NVARCHAR(50),
-    VentasTotales DECIMAL(18,2) DEFAULT 0
+-- Tabla Auditoria_Log (Pura escritura, cero lectura. Ideal para cazar índices inútiles)
+CREATE TABLE Auditoria_Log (
+    LogId INT IDENTITY(1,1) PRIMARY KEY CLUSTERED,
+    Usuario NVARCHAR(50),
+    Accion NVARCHAR(100),
+    FechaLog DATETIME DEFAULT GETDATE()
 );
 GO
+CREATE NONCLUSTERED INDEX IX_Log_User ON Auditoria_Log(Usuario);
+CREATE NONCLUSTERED INDEX IX_Log_Action ON Auditoria_Log(Accion);
+CREATE NONCLUSTERED INDEX IX_Log_Date ON Auditoria_Log(FechaLog);
 
--- El DBA inexperto creó estos índices pensando que se usarían, pero no es así.
-CREATE NONCLUSTERED INDEX IX_Vendedores_Nombre ON Vendedores(Nombre);
-CREATE NONCLUSTERED INDEX IX_Vendedores_Region ON Vendedores(Region);
-
-PRINT 'Simulando trabajo de Vendedores (Generando Índices Inútiles)...';
--- Insertamos datos masivos simulando contrataciones y actualizaciones de ventas (pura escritura)
-DECLARE @l INT = 0;
-WHILE @l < 1000
+PRINT 'Generando Logs de Auditoría (Generando ÍNDICES INÚTILES masivos)...';
+DECLARE @log INT = 0;
+WHILE @log < 8000
 BEGIN
-    INSERT INTO Vendedores (Nombre, Region, VentasTotales) 
-    VALUES ('Vendedor ' + CAST(@l AS NVARCHAR), CHOOSE((@l % 3) + 1, 'Norte', 'Sur', 'Centro'), RAND() * 50000);
-    SET @l = @l + 1;
+    INSERT INTO Auditoria_Log (Usuario, Accion) 
+    VALUES ('Admin', 'Acción de sistema ' + CAST(@log AS NVARCHAR));
+    SET @log = @log + 1;
 END
 GO
 
 -- ========================================================================================
--- ESCENARIO 5: ÍNDICES FALTANTES (Missing Indexes)
--- Tabla: Detalle_Pedidos
--- Técnica: Simulamos que los analistas de negocio están haciendo reportes costosos
--- constantemente filtrando por ProductoId y Cantidad, pero el DBA olvidó ponerle un índice.
--- Esto forzará a SQL Server a pedir un Missing Index.
+-- ESCENARIO 4: ÍNDICES FALTANTES (Missing Indexes Complejos)
+-- Tabla: Detalle_Pedidos y Facturas
+-- Técnica: Realizar consultas pesadas (agrupaciones, filtros) repetidas veces en columnas
+-- sin indexar. SQL Server detectará que falta un índice para mejorar el rendimiento.
 -- ========================================================================================
 CREATE TABLE Detalle_Pedidos (
     DetalleId INT IDENTITY(1,1) PRIMARY KEY CLUSTERED,
-    PedidoId UNIQUEIDENTIFIER, -- Simula llave foránea
-    ProductoId INT,            -- Simula llave foránea
+    PedidoId UNIQUEIDENTIFIER, 
+    ProductoId INT,            
     Cantidad INT,
     PrecioUnitario DECIMAL(18,2)
 );
 GO
 
-PRINT 'Generando Detalles de Pedidos y simulando reportes lentos (Missing Indexes)...';
+CREATE TABLE Facturas (
+    FacturaId INT IDENTITY(1,1) PRIMARY KEY CLUSTERED,
+    PedidoId UNIQUEIDENTIFIER,
+    EstadoFactura NVARCHAR(50),
+    FechaVencimiento DATETIME
+);
+GO
+
+PRINT 'Generando Detalles de Pedidos y Facturas (Para crear ÍNDICES FALTANTES)...';
 DECLARE @m INT = 0;
-WHILE @m < 5000
+WHILE @m < 15000
 BEGIN
     INSERT INTO Detalle_Pedidos (PedidoId, ProductoId, Cantidad, PrecioUnitario) 
     VALUES (
         NEWID(), 
-        ABS(CHECKSUM(NEWID())) % 10000 + 1, 
+        ABS(CHECKSUM(NEWID())) % 3000 + 1, 
         ABS(CHECKSUM(NEWID())) % 20 + 1, 
         (RAND() * 500) + 5
     );
+    
+    INSERT INTO Facturas (PedidoId, EstadoFactura, FechaVencimiento)
+    VALUES (
+        NEWID(),
+        CHOOSE((@m % 3) + 1, 'Pagada', 'Pendiente', 'Vencida'),
+        DATEADD(day, (@m % 30) - 15, GETDATE())
+    );
+    
     SET @m = @m + 1;
 END
 GO
 
--- Limpiar el caché de planes para asegurar que el motor registre el missing index limpiamente
+-- Limpiar el caché de planes para asegurar que el motor registre los missing indexes limpiamente
 DBCC FREEPROCCACHE;
 GO
 
--- Ejecutar consultas de "Reportes de Ventas" repetidas veces para generar "User Seeks" perdidos
+PRINT 'Ejecutando reportes pesados para simular lentitud...';
 DECLARE @n INT = 0;
-WHILE @n < 50
+WHILE @n < 70
 BEGIN
     DECLARE @TotalVendido DECIMAL(18,2);
-    -- ¡Reporte pesado sin índice!
+    
+    -- Reporte 1: Falta índice en Detalle_Pedidos (ProductoId, Cantidad)
     SELECT @TotalVendido = SUM(Cantidad * PrecioUnitario)
     FROM Detalle_Pedidos 
     WHERE ProductoId = 1500 AND Cantidad > 5;
     
+    -- Reporte 2: Falta índice en Facturas (EstadoFactura, FechaVencimiento)
+    DECLARE @TotalFacturas INT;
+    SELECT @TotalFacturas = COUNT(FacturaId)
+    FROM Facturas
+    WHERE EstadoFactura = 'Vencida' AND FechaVencimiento < GETDATE();
+    
+    -- Reporte 3: Falta índice en Detalle_Pedidos (PedidoId)
+    DECLARE @TempID UNIQUEIDENTIFIER = NEWID();
+    SELECT @TotalVendido = SUM(PrecioUnitario)
+    FROM Detalle_Pedidos
+    WHERE PedidoId = @TempID;
+
     SET @n = @n + 1;
 END
 GO
@@ -203,11 +227,13 @@ GO
 -- ========================================================================================
 -- FIN DEL SCRIPT.
 -- RECOMENDACIÓN FINAL: 
--- 1. Ve a SmartFill > Bases de Datos > Conéctate a "SmartFill_VentasDB"
--- 2. Ve a WhatsApp o a tu dashboard web y corre los comandos:
---    /estado, /optimizar, /indices, /espacio
+-- 1. Ve a SmartFill > Bases de Datos > Conéctate a "SmartFill_VentasDB" (si ya estabas, actualiza)
+-- 2. Ve al Chat de Prueba o Dashboard y maravíllate viendo cómo detecta:
+--    - Múltiples fragmentaciones (Críticas y Moderadas)
+--    - Más de 4 índices inútiles para borrar (Log y Productos)
+--    - Hasta 3 índices faltantes para crear (Detalle_Pedidos, Facturas)
 -- ========================================================================================
 PRINT '==========================================================';
-PRINT 'Base de datos de ventas "SmartFill_VentasDB" creada con exito.';
-PRINT 'Lista para probar TODAS las funciones de SmartFill.';
+PRINT 'Base de datos de ventas "SmartFill_VentasDB" RECREADA con exito.';
+PRINT 'Lista para probar TODAS las funciones AVANZADAS de SmartFill.';
 PRINT '==========================================================';

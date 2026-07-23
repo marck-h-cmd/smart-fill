@@ -18,7 +18,7 @@ export default function TrendChart({ data = [], tableName = '' }) {
     chartRef.current = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: data.map(d => d.table_name),
+        labels: data.map(d => d.index_name || d.table_name),
         datasets: [{
           label: 'Fragmentación (%)',
           data: data.map(d => d.fragmentation_percent),
@@ -40,6 +40,18 @@ export default function TrendChart({ data = [], tableName = '' }) {
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (context) => {
+                const item = data[context[0].dataIndex];
+                return `Índice: ${item.index_name || item.table_name}`;
+              },
+              afterTitle: (context) => {
+                const item = data[context[0].dataIndex];
+                return `Tabla: ${item.table_name} ${item.index_type ? '(' + item.index_type.replace('_INDEX', '') + ')' : ''}`;
+              }
+            }
+          }
         },
         scales: {
           y: {
@@ -49,7 +61,14 @@ export default function TrendChart({ data = [], tableName = '' }) {
             grid: { color: 'rgba(75, 85, 99, 0.3)' },
           },
           x: {
-            ticks: { color: '#9ca3af', font: { size: 11 } },
+            ticks: { 
+              color: '#9ca3af', 
+              font: { size: 11 },
+              callback: function(val, index) {
+                const label = this.getLabelForValue(val);
+                return label.length > 15 ? label.substr(0, 15) + '...' : label;
+              }
+            },
             grid: { display: false },
           },
         },
@@ -72,7 +91,7 @@ export default function TrendChart({ data = [], tableName = '' }) {
   return (
     <div className="panel p-6">
       <h3 className="text-sm font-mono text-fgMuted uppercase tracking-wider mb-4">
-        Fragmentación por Tabla {tableName && `- ${tableName}`}
+        Fragmentación {tableName && `- ${tableName}`}
       </h3>
       <div className="h-64">
         <canvas ref={canvasRef} />

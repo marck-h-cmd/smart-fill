@@ -15,17 +15,22 @@ def get_trends(days_back=30):
 
     table_groups = {}
     for r in recent:
-        key = r.nombre_tabla
+        key = f"{r.nombre_tabla} - {r.index_name}" if r.index_name else r.nombre_tabla
         if key not in table_groups:
             table_groups[key] = []
         table_groups[key].append(r)
 
     trends = []
-    for table_name, records in table_groups.items():
+    for group_key, records in table_groups.items():
         records.sort(key=lambda x: x.ultima_actualizacion)
+        table_name = records[0].nombre_tabla
+        index_name = records[0].index_name
+        
         if len(records) < 2:
             trends.append({
                 "table_name": table_name,
+                "index_name": index_name,
+                "group_key": group_key,
                 "current_frag": records[-1].fragmentacion_porcentaje,
                 "previous_frag": records[-1].fragmentacion_porcentaje,
                 "change": 0,
@@ -53,6 +58,8 @@ def get_trends(days_back=30):
 
         trends.append({
             "table_name": table_name,
+            "index_name": index_name,
+            "group_key": group_key,
             "current_frag": current,
             "previous_frag": previous,
             "change": change,

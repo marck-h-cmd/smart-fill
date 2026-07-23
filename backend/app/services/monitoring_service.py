@@ -239,7 +239,7 @@ def create_missing_index(conn, group_handle):
             try:
                 c.execute(text(script))
                 trans.commit()
-                return {"status": "success", "message": f"Índice creado exitosamente", "script": script}
+                return {"status": "success", "message": "Índice creado exitosamente", "script": script}
             except Exception as e:
                 trans.rollback()
                 return {"status": "error", "message": f"Error ejecutando script: {str(e)}", "script": script}

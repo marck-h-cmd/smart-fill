@@ -5,7 +5,8 @@ class TablaMetricas(db.Model):
     __tablename__ = 'tabla_metricas'
     
     id = db.Column(db.Integer, primary_key=True)
-    nombre_tabla = db.Column(db.String(100), nullable=False, unique=True)
+    nombre_tabla = db.Column(db.String(100), nullable=False)
+    index_name = db.Column(db.String(255), nullable=True)
     fragmentacion_porcentaje = db.Column(db.Float, nullable=False)
     fillfactor_actual = db.Column(db.Integer, nullable=False)
     total_filas = db.Column(db.Integer, nullable=False)
@@ -14,6 +15,7 @@ class TablaMetricas(db.Model):
     def to_dict(self):
         return {
             'nombre_tabla': self.nombre_tabla,
+            'index_name': self.index_name,
             'fragmentacion_porcentaje': self.fragmentacion_porcentaje,
             'fillfactor_actual': self.fillfactor_actual,
             'total_filas': self.total_filas,
