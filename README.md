@@ -42,58 +42,99 @@ smart-fill/
 ## ⚙️ Instalación y Configuración Local
 
 ### Prerrequisitos
-* Node.js v18+ y pnpm
-* Python 3.12+ (recomendado `pyenv`)
-* Contenedor de SQL Server corriendo localmente (Docker)
+* **Node.js**: v18 o superior y `npm` / `pnpm`
+* **Python**: 3.10 o superior (recomendado 3.12)
+* **SQL Server**: Instancia local o remota de Microsoft SQL Server (2017+)
+* **Git**: Para clonar los repositorios
 
-### 1. Levantar la Base de Datos
-Asegúrate de que tu contenedor de SQL Server esté ejecutándose e inyecta la base de datos de prueba:
+---
+
+### 1. Configuración de la Base de Datos (SQL Server)
+Ejecute el script de demostración `SmartFill_DemoDB.sql` en SQL Server Management Studio (SSMS) o mediante `sqlcmd` para crear la base de datos de pruebas con escenarios de fragmentación e índices:
 ```bash
-# Ejemplo usando sqlcmd dentro del contenedor
-/opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'TuPasswordFuerte' -i northwind.sql
+sqlcmd -S localhost -U SA -P 'TuPasswordFuerte' -i SmartFill_DemoDB.sql
 ```
 
-### 2. Configuración del Backend (Python)
+---
+
+### 2. Configuración del Backend (Python / Flask)
+Navegue a la carpeta `backend`, cree el entorno virtual e instale las dependencias:
 ```bash
 cd backend
 python -m venv venv
-venv\Scripts\activate  # En Windows
-# source venv/bin/activate # En Linux/Mac
+
+# En Windows:
+.\venv\Scripts\activate
+# En Linux/macOS:
+# source venv/bin/activate
+
 pip install -r requirements.txt
 ```
-Configura tu archivo `.env` con tus claves de IA:
+
+Cree un archivo `.env` dentro de la carpeta `backend/` con la siguiente configuración:
 ```env
-OPENAI_API_KEY=tu_clave
-GROQ_API_KEY=tu_clave
-TRANSFORMERS_OFFLINE=1
-LITELLM_TELEMETRY=False
+DATABASE_URL="mssql+pyodbc:///?odbc_connect=DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=SmartFillDB;UID=SA;PWD=TuPassword;Encrypt=no"
+SECRET_KEY=tu_clave_secreta
+GEMINI_API_KEY=tu_api_key_gemini
+WA_API_URL=http://localhost:2785
+WA_WEBHOOK_URL=http://localhost:5000/api/whatsapp/webhook
 ```
 
-### 3. Configuración del Frontend (React/Vite)
+Inicie el servidor Flask:
 ```bash
-cd frontend
-npm install
-```
-
-### 4. Ejecución del Proyecto
-Para iniciar ambos servicios (Backend y Frontend) simultáneamente y de forma automática en Windows, ejecuta el script proporcionado en la raíz del proyecto:
-```bash
-start.bat
-```
-
-Alternativamente, puedes ejecutarlos de forma manual en terminales separadas:
-
-**Backend**:
-```bash
-cd backend
-venv\Scripts\activate
 python run.py
 ```
 
-**Frontend**:
+---
+
+### 3. Configuración del Frontend (React / Vite)
+En una nueva terminal, instale las dependencias del frontend e inicie el servidor de desarrollo:
 ```bash
 cd frontend
+npm install
+# o con pnpm: pnpm install
+
 npm run dev
+# o con pnpm: pnpm run dev
+```
+La aplicación web estará disponible en `http://localhost:5173`.
+
+---
+
+### 4. Configuración del Servidor WhatsApp (OpenWA)
+Para habilitar el chatbot y la recepción de alertas automáticas vía WhatsApp:
+
+1. **Clonar e instalar OpenWA**:
+   ```bash
+   git clone https://github.com/rmyndharis/OpenWA.git
+   cd OpenWA
+   npm install
+   ```
+
+2. **Configurar el archivo `.env` en OpenWA**:
+   Cree o modifique el archivo `.env` en la raíz de `OpenWA`:
+   ```env
+   PORT=2785
+   WEBHOOK_URL=http://localhost:5000/api/whatsapp/webhook
+   ```
+
+3. **Iniciar OpenWA**:
+   ```bash
+   npm run dev
+   ```
+
+4. **Autenticación en el Dashboard de OpenWA**:
+   * Al iniciar OpenWA, la consola imprimirá un **Secret Token** (Token de Acceso).
+   * Abra su navegador en `http://localhost:2886`.
+   * Ingrese el Secret Token para iniciar sesión en la consola de OpenWA.
+   * Cree una nueva sesión de WhatsApp y escanee el código QR generado con la cámara de su celular (*WhatsApp > Dispositivos vinculados*).
+
+---
+
+### 5. Inicio Rápido Automático (Windows)
+Para levantar el Backend y Frontend de SmartFill simultáneamente con un solo clic, ejecute el script en la raíz del proyecto:
+```cmd
+start.bat
 ```
 
 ## 🧠 Flujo de Trabajo del Agente IA (AI_Service)
